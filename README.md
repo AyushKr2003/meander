@@ -82,7 +82,7 @@ the panel) and disappears when you move the mouse.
 | Key | Action |
 |---|---|
 | arrows, `h` `j` `k` `l` | Move to the nearest control in that direction |
-| `Tab` / `Shift + Tab` | Next / previous control in reading order |
+| `Tab` / `Shift + Tab` | Next / previous control in reading order (music, volume, network and wallpapers keep upstream's `Tab`: next section or filter) |
 | `Home` / `End` | First / last control |
 | `Enter` / `Space` | Activate (a click) |
 | `Menu` / `Shift + F10` | Secondary action (a right click: tray and dock menus, quick-setting pages) |
@@ -91,9 +91,17 @@ the panel) and disappears when you move the mouse.
 | `Escape` | Close the popout, or give the keyboard back from the bar / dock |
 
 `keybinds.lua` binds SUPER + CTRL + 0 to bar focus (`meander keys bar`). From
-there, a module that opens a popout hands the keyboard to it. Settings keeps
-its own keys (arrows and Tab change tabs, `/` searches); `Enter` steps into the
-page's controls, `↑` `↓` walk them, and `Escape` steps back out.
+there, a module that opens a popout hands the keyboard to it, and so do the
+tray menu, the dock's app menu (`Menu` on an app) and the side bar's music
+card.
+
+Settings keeps upstream's keys on its tab list (arrows and `Tab` change tabs,
+`Ctrl + K` or typing searches). `Enter` steps into the page: the same cursor
+as the popouts reaches every control there, sliders and switches included,
+and `Escape` steps back out to the tabs (a second `Escape` closes Settings).
+
+The wallpaper and theme pickers drive their carousel themselves: `←` `→`
+move, `Enter` applies, `Tab` changes the filter or searches.
 
 `meander.lua` is Serpantinum's Hyprland look (borderless windows, 4/6px gaps,
 light blur, no shadow, its pop-in animations), with window corners that follow

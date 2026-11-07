@@ -2,6 +2,7 @@ Dock 1.0 dock/Dock.qml
 Dim 1.0 Dim.qml
 Main 1.0 Main.qml
 KeyNav 1.0 keynav/KeyNav.qml
+KeyNavCard 1.0 keynav/KeyNavCard.qml
 ThemePicker 1.0 themepicker/ThemePicker.qml
 
 Bar 1.0 bar/Bar.qml

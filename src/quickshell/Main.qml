@@ -34,13 +34,13 @@ PanelWindow {
     Shortcut {
         sequences: ["Ctrl+Tab"]
         context: Qt.WindowShortcut
-        enabled: keyNav.active && !keyNav.followFocus
+        enabled: keyNav.active && masterWindow.currentActive !== "guide"
         onActivated: masterWindow.cyclePanel(1)
     }
     Shortcut {
         sequences: ["Ctrl+Shift+Tab", "Ctrl+Backtab"]
         context: Qt.WindowShortcut
-        enabled: keyNav.active && !keyNav.followFocus
+        enabled: keyNav.active && masterWindow.currentActive !== "guide"
         onActivated: masterWindow.cyclePanel(-1)
     }
 
@@ -673,6 +673,12 @@ PanelWindow {
                 // Meander: keys no popout control took drive the keyboard
                 // cursor (KeyNav).
                 Keys.onPressed: (event) => keyNav.handle(event)
+                // A popout's own Shortcuts (the calendar's Left/Right) beat
+                // any Keys handler: while the cursor is shown, its keys are
+                // claimed so they reach it.
+                Keys.onShortcutOverride: (event) => {
+                    if (keyNav.claims(event)) event.accepted = true;
+                }
 
                 Keys.onEscapePressed: (event) => {
                     switchWidget("hidden", "");
@@ -685,14 +691,23 @@ PanelWindow {
             }
 
             // Meander: full keyboard mode for every popout (keynav/KeyNav.qml).
-            // Settings moves its own focus; there the ring only follows it.
+            // Settings: its arrows walk the tabs (upstream); the cursor runs
+            // in the page once Enter steps in (GuidePopup.keyNavContent).
             KeyNav {
                 id: keyNav
                 anchors.fill: parent
-                scope: widgetStack.currentItem
-                active: masterWindow.isVisible && !masterWindow.isClosing && masterWindow.currentActive !== "hidden"
-                followFocus: masterWindow.currentActive === "guide"
+                readonly property Item page: widgetStack.currentItem
+                readonly property bool settings: masterWindow.currentActive === "guide"
+                scope: !settings ? page : (page && page.keyNavContent ? page.keyNavScope : null)
+                active: masterWindow.isVisible && !masterWindow.isClosing && masterWindow.currentActive !== "hidden" && scope !== null
                 onCycleRequested: (d) => masterWindow.cyclePanel(d)
+            }
+            Connections {
+                target: keyNav.settings ? keyNav.page : null
+                ignoreUnknownSignals: true
+                function onKeyNavContentChanged() { keyNav.reset(keyNav.page.keyNavContent); }
+                function onCurrentTabChanged() { if (keyNav.page.keyNavContent) keyNav.reset(true); }
+                function onCurrentSubTabChanged() { if (keyNav.page.keyNavContent) keyNav.reset(true); }
             }
         }
 

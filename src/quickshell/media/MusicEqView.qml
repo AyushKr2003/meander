@@ -119,18 +119,30 @@ Item {
                                     }
                                 }
 
+                                function commitBand() {
+                                    var temp = Object.assign({}, root.eqData);
+                                    temp["b" + modelData.idx] = Math.round(value);
+                                    temp.preset = "Custom";
+                                    temp.pending = true;
+                                    root.eqData = temp;
+
+                                    root.lastEqUpdate = Date.now();
+
+                                    root.execCmd(Caching.qsDir + `/media/equalizer.sh set_band ${modelData.idx} ${Math.round(value)}`);
+                                }
+
                                 onPressedChanged: {
-                                    if (!pressed) {
-                                        var temp = Object.assign({}, root.eqData);
-                                        temp["b" + modelData.idx] = Math.round(value);
-                                        temp.preset = "Custom";
-                                        temp.pending = true;
-                                        root.eqData = temp;
-                                        
-                                        root.lastEqUpdate = Date.now();
-                                        
-                                        root.execCmd(Caching.qsDir + `/media/equalizer.sh set_band ${modelData.idx} ${Math.round(value)}`);
-                                    }
+                                    if (!pressed) commitBand();
+                                }
+
+                                // Meander: a band moved from the keyboard
+                                // (KeyNav) is never pressed, so it was never
+                                // applied; commit once the keys settle.
+                                onMoved: if (!pressed) keyCommit.restart()
+                                Timer {
+                                    id: keyCommit
+                                    interval: 250
+                                    onTriggered: eqSlider.commitBand()
                                 }
 
                                 background: Rectangle {

@@ -436,8 +436,15 @@ DockWindowApps {
         focusHome: dockKeys
         active: dockWindowRoot.keyFocus && !dockWindowRoot.editMode
         onCycleRequested: KeyNavState.focusBar(dockWindowRoot.myOutput)
-        // The app (or its menu) takes over from here.
-        onActivated: dockRelease.restart()
+        // The app (or its menu) takes over from here; the app menu takes
+        // the keyboard (KeyNavCard in DockAppMenu.qml).
+        onActivated: (target, secondary) => {
+            if (secondary) {
+                KeyNavState.pendingKeys = true;
+                dockPendingClear.restart();
+            }
+            dockRelease.restart();
+        }
         onKeyModeChanged: if (!keyMode && dockWindowRoot.keyFocus) KeyNavState.release()
     }
     Shortcut {
@@ -447,5 +454,6 @@ DockWindowApps {
         onActivated: KeyNavState.focusBar(dockWindowRoot.myOutput)
     }
     Timer { id: dockRelease; interval: 60; onTriggered: KeyNavState.release() }
+    Timer { id: dockPendingClear; interval: 1500; onTriggered: KeyNavState.pendingKeys = false }
     Timer { id: dockKeysIdle; interval: 30000; onTriggered: KeyNavState.release() }
 }

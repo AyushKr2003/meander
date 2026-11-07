@@ -4,6 +4,22 @@ What changed in each version of Meander, newest first. Versions are the ones in 
 
 Meander's version is the Serpantinum release it is built on plus a port revision: `2.4.2-1` is the first Meander release on Serpantinum 2.4.2, `2.4.2-2` a Meander-only change on the same base, and `2.4.3-1` the first release after merging Serpantinum 2.4.3. `upstream.json` holds the exact upstream commit; `meander upstream` shows how far behind Serpantinum's latest release and master it is.
 
+## 2.4.2-4 - 2026-11-07
+
+Upstream base: unchanged (Serpantinum v2.4.2 +10 commits, `246061b`).
+
+### Added
+- **keyboard**: the tray menu, the dock's app menu (Menu on an app) and the side bar's music card take the keyboard when opened from bar or dock focus: arrows move, Enter picks, Escape closes
+
+### Changed
+- **settings**: Enter steps into the page with the same keyboard cursor as the popouts, so every control is reachable (sliders, switches, time selectors, file pickers, preset and wallpaper tiles); Escape steps back to the tab list
+- **wallpapers**: the keyboard cursor stays out of the carousel, which takes its own keys (its ring sat on one card while Enter applied another)
+
+### Fixed
+- **settings**: Escape always closed Settings; it now clears or closes the search and leaves the page first
+- **calendar**: Left/Right always flipped the month or weather view, so the keyboard cursor could only move up and down; while the cursor is shown they move it
+- **music**: equalizer bands changed from the keyboard moved but were never applied
+
 ## 2.4.2-3 - 2026-11-07
 
 Upstream base: unchanged (Serpantinum v2.4.2 +10 commits, `246061b`).

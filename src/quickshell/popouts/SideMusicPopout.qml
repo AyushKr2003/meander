@@ -15,7 +15,9 @@ PanelWindow {
 
     WlrLayershell.namespace: "sidemusic"
     WlrLayershell.layer: WlrLayer.Top
-    focusable: false
+    // Meander: opened from bar focus (KeyNav), it takes the keyboard so its
+    // controls can be driven; otherwise it never does, as upstream.
+    WlrLayershell.keyboardFocus: cardKeys.keyFocus ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"
 
@@ -548,4 +550,18 @@ PanelWindow {
             }
         }
     }
+
+    // ---- Meander: keyboard (keynav/KeyNavCard.qml)
+    // Opened from bar focus, a cursor walks the card: arrows move, Enter
+    // clicks, Left/Right on the seek bar seek, Escape closes.
+    KeyNavCard {
+        id: cardKeys
+        anchors.fill: parent
+        open: sideMusicPopout.isVisible
+        scope: menuContainer
+        onCloseRequested: SideMusicController.hide()
+        // Back to a hover card: it closes unless the pointer is on it.
+        onReleased: SideMusicController.requestHide()
+    }
+
 }

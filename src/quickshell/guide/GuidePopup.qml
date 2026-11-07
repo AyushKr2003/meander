@@ -15,6 +15,20 @@ Item {
     focus: true
 
     readonly property bool isGuidePopup: true
+
+    // Meander: the keyboard cursor (keynav/KeyNav.qml, driven from Main.qml).
+    // Upstream's arrows and Tab walk the sidebar's tabs; Enter steps into
+    // the page, where the same cursor as every other popout reaches every
+    // control (sliders, switches, tiles: most of them take no Tab focus),
+    // and Escape steps back out to the tabs.
+    property bool keyNavContent: false
+    readonly property Item keyNavScope: contentArea
+    onSearchActiveChanged: if (searchActive) keyNavContent = false
+    function leaveKeyNavContent() {
+        keyNavContent = false;
+        root.forceActiveFocus();
+    }
+
     readonly property bool loadsTabs: visible
     readonly property bool compact: width < s(780)
 
@@ -819,6 +833,7 @@ Item {
             focusTimer.restart();
             resetAndPlayIntro();
         } else {
+            keyNavContent = false;
             closeSequence.stop();
             shellStartupSequence.stop();
             searchLoadTimer.stop();
@@ -892,8 +907,31 @@ Item {
         }
     }
 
+    // Meander: the popout window's Escape Shortcut (Main.qml) beats any Keys
+    // handler, so upstream's Escape below (clear the search, close it, leave
+    // the page) never ran and Escape always closed Settings. Claim it while
+    // there is a step to go back.
+    Keys.onShortcutOverride: (event) => {
+        if (event.key === Qt.Key_Escape && (root.searchActive || root.keyNavContent || root.focusInContent()))
+            event.accepted = true;
+    }
+
     Keys.onPressed: (event) => {
         let plain = !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier));
+        // Meander: in the page, the keyboard cursor (Main.qml's KeyNav) takes
+        // every key but Escape, which goes back to the tabs.
+        if (root.keyNavContent && !root.searchActive) {
+            if (event.key === Qt.Key_Escape) {
+                root.leaveKeyNavContent();
+                event.accepted = true;
+            }
+            return;
+        }
+        if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && plain && !root.searchActive && !root.focusInContent()) {
+            root.keyNavContent = true;
+            event.accepted = true;
+            return;
+        }
         if (event.key === Qt.Key_Escape) {
             if (root.searchActive) {
                 if (root.searchQuery !== "") {

@@ -16,6 +16,10 @@ import "KeyNavLogic.js" as Logic
 //   Left/Right on a slider   change its value (Shift: by 1)
 //   Ctrl+Tab, Ctrl+Shift+Tab next / previous panel (cycleRequested)
 //
+// A popout's own Shortcuts win over Keys handlers: the owner claims the
+// cursor's keys with claims() from Keys.onShortcutOverride (the calendar's
+// Left/Right), while upstream's Tab (music, volume, network: sections) stays.
+//
 // It works on upstream's code as it is, so upstream merges stay clean: the
 // controls are found by walking `scope` on every key, not declared. A stop
 // is a MouseArea with the pointing-hand cursor (how every upstream button
@@ -44,9 +48,6 @@ Item {
     property Item focusHome: scope
     // Off: every key passes through and nothing is drawn.
     property bool active: true
-    // The panel does its own keyboard focus (Settings): only draw the ring
-    // around whatever holds focus, never move it.
-    property bool followFocus: false
 
     // The ring shows only while the keyboard is in use; moving the pointer
     // hides it (the cursor is kept for the next key).
@@ -58,7 +59,8 @@ Item {
     readonly property bool ringShown: active && keyMode && cursor !== null && ring.rect.w > 0
 
     signal cycleRequested(int direction)
-    signal activated(Item target)
+    // `secondary`: Menu / Shift+F10 (a right click).
+    signal activated(Item target, bool secondary)
 
     // ------------------------------------------------------------ discovery
 
@@ -272,14 +274,14 @@ Item {
         const t = cursor
         if (!t) return false
         const own = nearest(t, "keyNavActivate")
-        if (own && !secondary) { own.keyNavActivate(); activated(t); return true }
+        if (own && !secondary) { own.keyNavActivate(); activated(t, false); return true }
         if (cursorKind === "text") { t.forceActiveFocus(); return true }
         if (cursorKind === "slider") return false
         const btn = secondary ? Qt.RightButton : Qt.LeftButton
         const ma = cursorKind === "mouse" ? t : findMouseArea(t)
         if (ma && !(ma.acceptedButtons & btn)) return false
         click(t, btn, modifiers || Qt.NoModifier)
-        activated(t)
+        activated(t, !!secondary)
         return true
     }
     function click(t, btn, mods) {
@@ -311,6 +313,11 @@ Item {
         if (typeof s.nudge === "function") {
             for (let i = 0; i < n; i++) s.nudge(dx)
             if (typeof s.dragFinished === "function") s.dragFinished()
+        } else if (typeof s.increase === "function" && typeof s.decrease === "function") {
+            // A Qt Quick Controls Slider (the music EQ): as its own arrow
+            // keys do, then moved() with no argument (it takes none).
+            for (let i = 0; i < n; i++) dx > 0 ? s.increase() : s.decrease()
+            s.moved()
         } else {
             // SliderProgress: as its own arrow keys do.
             s.value = Math.max(Math.min(s.from, s.to), Math.min(Math.max(s.from, s.to), s.value + dx * n * unit))
@@ -332,25 +339,6 @@ Item {
         const back = k === Qt.Key_Backtab || (mods & Qt.ShiftModifier)
 
         if (isTab && ctrl) { cycleRequested(back ? -1 : 1); return accept(event) }
-
-        if (followFocus) {
-            // Settings: its arrows and Tab change tabs until a control has
-            // focus, and nothing upstream gives one focus from the keyboard.
-            // Enter steps into the page's first control; from there its own
-            // Up/Down walk the controls and Escape steps back out.
-            const w = root.Window.window
-            const f = w ? w.activeFocusItem : null
-            if ((k === Qt.Key_Return || k === Qt.Key_Enter) && plain && (!f || f === scope)) {
-                const n = scope.nextItemInFocusChain(true)
-                if (n && n !== scope) {
-                    n.forceActiveFocus(Qt.TabFocusReason)
-                    wake()
-                    return accept(event)
-                }
-            }
-            if (isTab || k === Qt.Key_Up || k === Qt.Key_Down || k === Qt.Key_Left || k === Qt.Key_Right) wake()
-            return false
-        }
 
         let dx = 0, dy = 0
         if (plain) {
@@ -386,6 +374,18 @@ Item {
         return false
     }
     function accept(event) { event.accepted = true; return true }
+
+    // A popout's own Shortcut on a key (the calendar's Left/Right) wins over
+    // every Keys handler. While the cursor is shown, the owner claims the
+    // keys the cursor uses from its Keys.onShortcutOverride, so they reach
+    // handle(). Tab stays the popout's (music, volume, network: sections).
+    function claims(event) {
+        if (!active || !scope || !keyMode || !cursorAlive()) return false
+        if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) return false
+        const k = event.key
+        return k === Qt.Key_Left || k === Qt.Key_Right || k === Qt.Key_Up || k === Qt.Key_Down
+            || k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_Space
+    }
 
     function cursorAlive() {
         if (!cursor) return false
@@ -438,13 +438,6 @@ Item {
         const i = Math.max(0, Math.min(cursorIndex, es.length - 1))
         cursorIndex = i
         setCursor(es[i])
-    }
-
-    // Settings moves focus with keys we never see (it accepts them first):
-    // a control taking focus there means the keyboard is in use.
-    Connections {
-        target: root.followFocus && root.active ? root.Window.window : null
-        function onActiveFocusItemChanged() { if (root.focusTarget()) root.wake() }
     }
 
     // ---------------------------------------------------------- the pointer
@@ -514,9 +507,9 @@ Item {
             return c
         }
         function update() {
-            const t = root.followFocus ? root.focusTarget() : root.cursor
+            const t = root.cursor
             if (!t || !root.active || !root.keyMode) { rect = { x: 0, y: 0, w: 0, h: 0 }; return }
-            if (!root.followFocus && !root.cursorAlive()) { rect = { x: 0, y: 0, w: 0, h: 0 }; restoreLater.restart(); return }
+            if (!root.cursorAlive()) { rect = { x: 0, y: 0, w: 0, h: 0 }; restoreLater.restart(); return }
             const r = root.rectOf(t)
             const out = gap + thickness
             inner = !Logic.contains(clipOf(t), Logic.grow(r, out))
@@ -528,7 +521,7 @@ Item {
         Timer { id: restoreLater; interval: 30; onTriggered: root.restore() }
 
         FrameAnimation {
-            running: root.active && root.keyMode && (root.cursor !== null || root.followFocus)
+            running: root.active && root.keyMode && root.cursor !== null
             onTriggered: ring.update()
         }
 
@@ -553,21 +546,5 @@ Item {
             border.color: ThemeBackend.primary
             antialiasing: true
         }
-    }
-
-    // Settings moves its own focus; the ring follows the focused control.
-    function focusTarget() {
-        const w = root.Window.window
-        let f = w ? w.activeFocusItem : null
-        if (!f || f === scope) return null
-        let inScope = false
-        for (let p = f; p; p = p.parent) if (p === scope) { inScope = true; break }
-        if (!inScope) return null
-        // A text field's ring goes around its box, not the bare text.
-        if (isTextField(f) && f.parent && f.parent !== scope && f.parent.height >= f.height) {
-            const box = f.parent.parent && f.parent.parent !== scope ? f.parent.parent : f.parent
-            return box.width > f.width + 40 ? f.parent : box
-        }
-        return f.activeFocusOnTab || isTextField(f) ? f : null
     }
 }

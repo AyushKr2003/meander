@@ -12,6 +12,10 @@ import "../reusables"
 Item {
     id: window
     visible: false
+    // Meander: the carousel takes every key itself (Left/Right, Enter, F,
+    // Tab), so the keyboard cursor (KeyNav) stays out, as in the theme
+    // picker; its ring sat on one card while Enter applied another.
+    property bool keyNavSkip: true
     width: Screen.width
     focus: true
 

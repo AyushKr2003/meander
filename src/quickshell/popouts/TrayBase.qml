@@ -16,7 +16,9 @@ PanelWindow {
 
     WlrLayershell.namespace: "traymenu"
     WlrLayershell.layer: WlrLayer.Overlay
-    focusable: false
+    // Meander: opened from bar or dock focus it takes the keyboard (see the
+    // KeyNavCard at the end); otherwise never, as upstream.
+    WlrLayershell.keyboardFocus: cardKeys.keyFocus ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"
 
@@ -895,4 +897,17 @@ PanelWindow {
             }
         }
     }
+
+    // ---- Meander: keyboard (keynav/KeyNavCard.qml)
+    // Opened with Enter or Menu from bar focus: arrows walk the items (and
+    // the submenus an item opens), Enter picks one, Escape closes.
+    KeyNavCard {
+        id: cardKeys
+        anchors.fill: parent
+        open: trayMenuWindow.isVisible
+        scope: rootContainer
+        onCloseRequested: trayMenuWindow.closeMenu()
+        onReleased: TrayMenuController.requestHide()
+    }
+
 }

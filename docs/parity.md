@@ -35,7 +35,7 @@ Meander 2.4.2-2 against Serpantinum 2.4.2 (+10 commits, `246061b`), module by mo
 | Media (MPRIS, lyrics, art, visualiser) | Same | |
 | Translations (23 languages) | Same | |
 | Theme picker (`themes` popout) | Meander only | Omarchy themes in the wallpaper picker's carousel (same cards, skew, motion, top bar); rows from `omarchy-theme-switcher --print-rows`, palettes from each `colors.toml` (`meander-core themes`), applied with `omarchy-theme-set` |
-| Keyboard navigation (popouts, bar focus, dock focus) | Meander only | Upstream is pointer-only. A cursor over each surface's controls (arrows/hjkl spatial, Tab reading order, Enter click, Menu right click, sliders on arrows, Ctrl+Tab between panels); Settings keeps upstream's keys and gains a visible focus ring and Enter into the page |
+| Keyboard navigation (popouts, bar focus, dock focus) | Meander only | Upstream is pointer-only. A cursor over each surface's controls (arrows/hjkl spatial, Tab reading order, Enter click, Menu right click, sliders on arrows, Ctrl+Tab between panels); Settings keeps upstream's tab keys; Enter steps into the page with the same cursor, Escape steps out (upstream's Escape handling never ran: the popout window's Escape Shortcut closed Settings first). Popout Shortcuts on arrows (calendar) yield while the cursor is shown; upstream's Tab stays in music, volume, network, wallpapers. Hover cards (tray menu, dock app menu, side music card) take the keyboard when opened from bar or dock focus. Music EQ bands moved from the keyboard are applied (upstream applied on mouse release only) |
 
 ## Native helpers
 

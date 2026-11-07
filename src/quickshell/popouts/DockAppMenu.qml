@@ -16,7 +16,9 @@ PanelWindow {
 
     WlrLayershell.namespace: "dockappmenu"
     WlrLayershell.layer: WlrLayer.Overlay
-    focusable: false
+    // Meander: opened from bar or dock focus it takes the keyboard (see the
+    // KeyNavCard at the end); otherwise never, as upstream.
+    WlrLayershell.keyboardFocus: cardKeys.keyFocus ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"
 
@@ -180,7 +182,8 @@ PanelWindow {
                 interval: 2400
                 repeat: false
                 onTriggered: {
-                    if (!menuHover.hovered) DockAppMenuController.hide();
+                    // Meander: not while the keyboard drives it (KeyNavCard).
+                    if (!menuHover.hovered && !cardKeys.keyFocus) DockAppMenuController.hide();
                 }
             }
 
@@ -463,4 +466,17 @@ PanelWindow {
             }
         }
     }
+
+    // ---- Meander: keyboard (keynav/KeyNavCard.qml)
+    // Opened with Menu from dock focus: arrows walk the items, Enter picks
+    // one, Escape closes.
+    KeyNavCard {
+        id: cardKeys
+        anchors.fill: parent
+        open: dockAppMenuWindow.isVisible
+        scope: rootContainer
+        onCloseRequested: DockAppMenuController.hide()
+        onReleased: autoCloseTimer.restart()
+    }
+
 }
