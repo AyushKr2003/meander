@@ -1,0 +1,29 @@
+{
+  "name": "Bat",
+  "category": "tools",
+  "icon": "󰭟",
+  "detect": {
+    "bin": [
+      "bat",
+      "batcat"
+    ]
+  },
+  "templates": [
+    {
+      "input": "meander.tmTheme",
+      "output": "$XDG_CONFIG_HOME/bat/themes/meander.tmTheme"
+    }
+  ],
+  "integrate": [
+    {
+      "type": "line",
+      "file": "$XDG_CONFIG_HOME/bat/config",
+      "line": "--theme=\"meander\"",
+      "disable": "^\\s*--theme(=|\\s)",
+      "create": true
+    }
+  ],
+  "reload": [
+    "for b in bat batcat; do command -v \"$b\" >/dev/null 2>&1 && \"$b\" cache --build >/dev/null 2>&1; done; true"
+  ]
+}

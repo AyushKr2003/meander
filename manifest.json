@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "meander.bar",
+  "name": "Meander",
+  "version": "2.4.2-1",
+  "author": "AyushKr2003",
+  "license": "AGPL-3.0-or-later",
+  "description": "A Serpantinum-style desktop shell for Omarchy: modular bar, morphing popouts, dock, desktop widgets, lock screen, launcher and settings.",
+  "kinds": [
+    "bar",
+    "service"
+  ],
+  "entryPoints": {
+    "bar": "src/quickshell/MeanderBar.qml",
+    "service": "src/quickshell/MeanderService.qml"
+  }
+}

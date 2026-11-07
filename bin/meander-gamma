@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+# meander-gamma -- Meander's blue light filter, the Omarchy stand-in for
+# Serpantinum's `serpantinum-gamma` Wayland daemon.
+#
+# Omarchy's night light is hyprsunset (`omarchy toggle nightlight`), so this
+# drives the same hyprsunset instead of holding the gamma control itself:
+# Omarchy's toggle, its indicator and Meander's settings all see one state.
+# hyprsunset applies one temperature to every output, so --output is accepted
+# and ignored.
+#
+#   start | status | quit
+#   set [--output NAME] --temperature K
+#   reset [--output NAME]
+#   location LAT LON | location clear
+#   fallback DAY_START NIGHT_START          (HH:MM, used without a location)
+#   auto on [--output NAME] --day K --night K | auto off
+
+set -uo pipefail
+
+SELF="$(realpath "${BASH_SOURCE[0]}")"
+ROOT="$(dirname "$(dirname "$SELF")")"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/meander"
+STATE="$STATE_DIR/gamma.json"
+PIDFILE="${XDG_RUNTIME_DIR:-/tmp}/meander/gamma-schedule.pid"
+
+mkdir -p "$STATE_DIR" "$(dirname "$PIDFILE")"
+[[ -s $STATE ]] || echo '{}' > "$STATE"
+
+state_set() {
+    local tmp="$STATE.tmp.$$"
+    jq "$@" "$STATE" > "$tmp" 2>/dev/null && mv -f "$tmp" "$STATE" || rm -f "$tmp"
+}
+
+ensure_hyprsunset() {
+    pgrep -x hyprsunset >/dev/null && return 0
+    if command -v uwsm-app >/dev/null 2>&1; then
+        setsid uwsm-app -- hyprsunset >/dev/null 2>&1 &
+    else
+        setsid hyprsunset >/dev/null 2>&1 &
+    fi
+    local i
+    for i in {1..25}; do
+        hyprctl hyprsunset temperature >/dev/null 2>&1 && return 0
+        sleep 0.2
+    done
+    return 1
+}
+
+# A freshly started hyprsunset applies its own default at the end of its boot;
+# resend until the value sticks, as omarchy-toggle-nightlight does.
+set_temperature() {
+    local k="$1" i
+    ensure_hyprsunset || return 1
+    for i in {1..10}; do
+        if (( k >= 6500 )); then
+            hyprctl hyprsunset identity >/dev/null 2>&1 && break
+        else
+            hyprctl hyprsunset temperature "$k" >/dev/null 2>&1
+            [[ $(hyprctl hyprsunset temperature 2>/dev/null | grep -oE '[0-9]+' | head -n1) == "$k" ]] && break
+        fi
+        sleep 0.2
+    done
+    omarchy-shell -q nightlight refresh >/dev/null 2>&1 || true
+}
+
+stop_schedule() {
+    local pid
+    [[ -f $PIDFILE ]] && pid=$(<"$PIDFILE") && [[ $pid =~ ^[0-9]+$ ]] && kill "$pid" 2>/dev/null
+    rm -f "$PIDFILE"
+}
+
+start_schedule() {
+    stop_schedule
+    setsid python3 -I "$ROOT/src/scripts/core/gamma_schedule.py" "$STATE" >/dev/null 2>&1 &
+    echo $! > "$PIDFILE"
+}
+
+opt() { # opt NAME ARGS... -> value after --NAME
+    local name="$1"; shift
+    while (( $# )); do
+        [[ $1 == "--$name" ]] && { echo "${2:-}"; return 0; }
+        shift
+    done
+    return 1
+}
+
+cmd="${1:-}"; [[ -n $cmd ]] && shift
+case "$cmd" in
+    start) ensure_hyprsunset ;;
+    status)
+        pgrep -x hyprsunset >/dev/null || exit 1
+        echo running
+        mode=$(jq -r '.mode // "off"' "$STATE"); echo "mode $mode"
+        ;;
+    quit) stop_schedule ;;
+    set)
+        k=$(opt temperature "$@") || exit 2
+        [[ $k =~ ^[0-9]+$ ]] || exit 2
+        stop_schedule
+        state_set --argjson k "$k" '.mode = "manual" | .temperature = $k'
+        set_temperature "$k"
+        ;;
+    reset)
+        stop_schedule
+        state_set '.mode = "off"'
+        ensure_hyprsunset && set_temperature 6500
+        ;;
+    location)
+        if [[ ${1:-} == clear ]]; then
+            state_set 'del(.lat, .lon)'
+        else
+            [[ ${1:-} =~ ^-?[0-9]+(\.[0-9]+)?$ && ${2:-} =~ ^-?[0-9]+(\.[0-9]+)?$ ]] || exit 2
+            state_set --argjson lat "$1" --argjson lon "$2" '.lat = $lat | .lon = $lon'
+        fi
+        ;;
+    fallback)
+        [[ ${1:-} =~ ^[0-9]{1,2}:[0-9]{2}$ && ${2:-} =~ ^[0-9]{1,2}:[0-9]{2}$ ]] || exit 2
+        state_set --arg d "$1" --arg n "$2" '.dayStart = $d | .nightStart = $n'
+        ;;
+    auto)
+        if [[ ${1:-} == off ]]; then
+            stop_schedule
+            state_set '.mode = "off"'
+            exit 0
+        fi
+        day=$(opt day "$@") || day=6500
+        night=$(opt night "$@") || night=4000
+        [[ $day =~ ^[0-9]+$ && $night =~ ^[0-9]+$ ]] || exit 2
+        ensure_hyprsunset || exit 1
+        state_set --argjson d "$day" --argjson n "$night" '.mode = "auto" | .day = $d | .night = $n'
+        start_schedule
+        ;;
+    -h|--help|"") sed -n '2,16p' "$SELF" | sed 's/^# \{0,1\}//' ;;
+    *) exit 2 ;;
+esac

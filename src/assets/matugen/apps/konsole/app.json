@@ -1,0 +1,17 @@
+{
+  "name": "Konsole",
+  "category": "terminals",
+  "icon": "",
+  "hint": "select_in_app",
+  "detect": {
+    "bin": [
+      "konsole"
+    ]
+  },
+  "templates": [
+    {
+      "input": "Meander.colorscheme",
+      "output": "$XDG_DATA_HOME/konsole/Meander.colorscheme"
+    }
+  ]
+}

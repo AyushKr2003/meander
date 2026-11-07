@@ -1,0 +1,17 @@
+{
+  "name": "Fish",
+  "category": "tools",
+  "icon": "󰈺",
+  "hint": "restart",
+  "detect": {
+    "bin": [
+      "fish"
+    ]
+  },
+  "templates": [
+    {
+      "input": "meander.fish",
+      "output": "$XDG_CONFIG_HOME/fish/conf.d/meander.fish"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "name": "Halloy",
+  "category": "apps",
+  "icon": "󰭹",
+  "detect": {
+    "bin": [
+      "halloy"
+    ],
+    "flatpak": [
+      "org.squidowl.halloy"
+    ]
+  },
+  "templates": [
+    {
+      "input": "meander.toml",
+      "output": "$XDG_CONFIG_HOME/halloy/themes/meander.toml"
+    }
+  ],
+  "integrate": [
+    {
+      "type": "line",
+      "file": "$XDG_CONFIG_HOME/halloy/config.toml",
+      "section": "",
+      "line": "theme = \"meander\"",
+      "disable": "^\\s*theme\\s*=",
+      "create": true
+    }
+  ],
+  "reload": [
+    "pkill -USR1 -x halloy; true"
+  ]
+}

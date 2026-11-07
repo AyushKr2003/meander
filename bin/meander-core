@@ -1,0 +1,187 @@
+#!/usr/bin/env bash
+# meander-core -- Meander's backend helper, the Omarchy stand-in for
+# Serpantinum's Rust `serpantinum-core`.
+#
+# Same command line and the same JSON on stdout (one object or array per
+# line), so the shell's QML talks to it unchanged. Where Omarchy already does
+# the job, this calls Omarchy (brightness, hibernation, clipboard history,
+# fingerprint setup); the rest is small scripts in src/scripts/core/.
+#
+#   sysinfo | watch sysinfo [--interval S]
+#   watch locks | watch brightness | watch idle MARKER | watch compositor
+#   brightness get|set N|raise N|lower N|backend
+#   screentime track|stats DATE [--app CLASS] [--db-dir DIR]
+#   launcher rank|log NAME|files QUERY
+#   monitors
+#   system can-hibernate|fingerprint
+#   clipboard list|decode|copy|pin|delete|wipe ... [--cache-dir DIR]
+
+set -uo pipefail
+
+SELF="$(realpath "${BASH_SOURCE[0]}")"
+ROOT="$(dirname "$(dirname "$SELF")")"
+CORE="$ROOT/src/scripts/core"
+PY=(python3 -I)
+
+usage() {
+    sed -n '2,17p' "$SELF" | sed 's/^# \{0,1\}//'
+}
+
+# ---------------------------------------------------------------- brightness
+# The first backlight in /sys, as Omarchy's own brightness command uses;
+# setting goes through `omarchy-brightness-display` so Omarchy's monitor and
+# Apple-display handling apply (with --no-osd: Meander draws its own OSD).
+backlight() {
+    local d
+    for d in /sys/class/backlight/*; do
+        [[ -r $d/brightness && -r $d/max_brightness ]] && { echo "$d"; return 0; }
+    done
+    return 1
+}
+
+brightness_percent() {
+    local d cur max
+    if d=$(backlight); then
+        cur=$(<"$d/brightness"); max=$(<"$d/max_brightness")
+        (( max > 0 )) && { echo $(( (cur * 100 + max / 2) / max )); return; }
+    fi
+    if command -v ddcutil >/dev/null 2>&1; then
+        local v
+        v=$(timeout 3 ddcutil getvcp 10 --brief 2>/dev/null | awk '{print $4}')
+        [[ $v =~ ^[0-9]+$ ]] && { echo "$v"; return; }
+    fi
+    echo -1
+}
+
+brightness_backend() {
+    if backlight >/dev/null; then echo backlight
+    elif command -v ddcutil >/dev/null 2>&1 && timeout 3 ddcutil detect --brief 2>/dev/null | grep -q '^Display'; then echo ddc
+    else echo none
+    fi
+}
+
+brightness_set() {
+    local pct="$1"
+    [[ $pct =~ ^[0-9]+$ ]] || return 1
+    (( pct > 100 )) && pct=100
+    if command -v omarchy-brightness-display >/dev/null 2>&1; then
+        omarchy-brightness-display --no-osd "${pct}%" >/dev/null 2>&1 && return 0
+    fi
+    if command -v brightnessctl >/dev/null 2>&1; then
+        brightnessctl -q set "${pct}%" && return 0
+    fi
+    command -v ddcutil >/dev/null 2>&1 && ddcutil setvcp 10 "$pct" >/dev/null 2>&1
+}
+
+cmd_brightness() {
+    case "${1:-get}" in
+        get) brightness_percent ;;
+        set) brightness_set "${2:-}" ;;
+        raise) brightness_set $(( $(brightness_percent) + ${2:-5} )) ;;
+        lower) local v=$(( $(brightness_percent) - ${2:-5} )); (( v < 1 )) && v=1; brightness_set "$v" ;;
+        backend) brightness_backend ;;
+        *) usage; return 2 ;;
+    esac
+}
+
+# sysfs sends no change events for backlight or LEDs, so these poll, cheaply
+# and only while the shell watches.
+watch_brightness() {
+    local backend last="" now
+    backend=$(brightness_backend)
+    while true; do
+        now=$(brightness_percent)
+        if [[ $now != "$last" ]]; then
+            printf '{"percent":%s,"backend":"%s"}\n' "$now" "$backend" || exit 0
+            last=$now
+        fi
+        [[ $backend == none ]] && exec sleep infinity
+        [[ $backend == ddc ]] && sleep 5 || sleep 0.4
+    done
+}
+
+led_state() {
+    local kind="$1" f
+    for f in /sys/class/leds/*::"$kind"/brightness; do
+        [[ -r $f ]] || continue
+        [[ $(<"$f") != 0 ]] && { echo true; return; }
+    done
+    echo false
+}
+
+watch_locks() {
+    local last="" now
+    while true; do
+        now="{\"capsLock\":$(led_state capslock),\"numLock\":$(led_state numlock)}"
+        if [[ $now != "$last" ]]; then
+            echo "$now" || exit 0
+            last=$now
+        fi
+        sleep 0.25
+    done
+}
+
+# Omarchy owns sleep and idle: its idle service runs the timeouts and
+# omarchy-system-sleep-lock locks (through `omarchy-shell lock`, which Meander
+# answers) before every suspend. So this only keeps the protocol alive for
+# Meander's opt-in idle engine; it reports no app inhibitors of its own.
+watch_idle() {
+    echo "log idle and sleep locking are handled by Omarchy"
+    # The shell writes "sleep-lock on|off" here; nothing to do with it.
+    cat >/dev/null
+    exec sleep infinity
+}
+
+# Hyprland is read natively by the shell; this feed was only for Sway, Niri
+# and Mango, which Omarchy doesn't run.
+watch_compositor() {
+    exec sleep infinity
+}
+
+cmd_monitors() {
+    hyprctl monitors -j 2>/dev/null | jq -c '[.[] | {name, width, height, refresh: (.refreshRate // 0), scale, focused}]' 2>/dev/null || echo '[]'
+}
+
+cmd_system() {
+    case "${1:-}" in
+        can-hibernate)
+            if command -v omarchy-hibernation-available >/dev/null 2>&1 && omarchy-hibernation-available >/dev/null 2>&1; then
+                echo yes
+            else
+                echo no
+            fi
+            ;;
+        fingerprint)
+            # Exit 0 when a finger is enrolled (`omarchy setup security fingerprint`).
+            command -v fprintd-list >/dev/null 2>&1 || exit 1
+            fprintd-list "${USER:-$(id -un)}" 2>/dev/null | grep -qE '^\s*-\s*#[0-9]+:' || exit 1
+            ;;
+        *) usage; return 2 ;;
+    esac
+}
+
+cmd="${1:-}"
+[[ -n $cmd ]] && shift
+case "$cmd" in
+    sysinfo) exec "${PY[@]}" "$CORE/sysinfo.py" "$@" ;;
+    watch)
+        what="${1:-}"; [[ -n $what ]] && shift
+        case "$what" in
+            sysinfo) exec "${PY[@]}" "$CORE/sysinfo.py" watch "$@" ;;
+            locks) watch_locks ;;
+            brightness) watch_brightness ;;
+            idle) watch_idle ;;
+            compositor) watch_compositor ;;
+            *) usage; exit 2 ;;
+        esac
+        ;;
+    brightness) cmd_brightness "$@" ;;
+    screentime) exec "${PY[@]}" "$CORE/screentime.py" "$@" ;;
+    launcher) exec "${PY[@]}" "$CORE/launcher.py" "$@" ;;
+    clipboard) exec "${PY[@]}" "$CORE/clipboard.py" "$@" ;;
+    monitors) cmd_monitors ;;
+    system) cmd_system "$@" ;;
+    quit) pkill -f "$CORE/screentime.py track" 2>/dev/null; exit 0 ;;
+    -h|--help|help|"") usage ;;
+    *) usage; exit 2 ;;
+esac

@@ -1,0 +1,6 @@
+[config]
+reload_apps = false
+
+[templates.quickshell]
+input_path = "templates/meander_matugen_colors.json.template"
+output_path = "~/.local/state/meander/qs_colors.json"

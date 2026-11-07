@@ -1,0 +1,27 @@
+{
+  "name": "Superfile",
+  "category": "tools",
+  "icon": "󰉋",
+  "hint": "restart",
+  "detect": {
+    "bin": [
+      "spf",
+      "superfile"
+    ]
+  },
+  "templates": [
+    {
+      "input": "meander.toml",
+      "output": "$XDG_CONFIG_HOME/superfile/theme/meander.toml"
+    }
+  ],
+  "integrate": [
+    {
+      "type": "line",
+      "file": "$XDG_CONFIG_HOME/superfile/config.toml",
+      "section": "",
+      "line": "theme = \"meander\"",
+      "disable": "^\\s*theme\\s*="
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "Atuin",
+  "category": "tools",
+  "icon": "󰋚",
+  "detect": {
+    "bin": [
+      "atuin"
+    ]
+  },
+  "templates": [
+    {
+      "input": "meander.toml",
+      "output": "$XDG_CONFIG_HOME/atuin/themes/meander.toml"
+    }
+  ],
+  "integrate": [
+    {
+      "type": "line",
+      "file": "$XDG_CONFIG_HOME/atuin/config.toml",
+      "section": "theme",
+      "line": "name = \"meander\"",
+      "disable": "^\\s*name\\s*=",
+      "create": true
+    }
+  ]
+}

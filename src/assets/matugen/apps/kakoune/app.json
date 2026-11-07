@@ -1,0 +1,26 @@
+{
+  "name": "Kakoune",
+  "category": "editors",
+  "icon": "󰘧",
+  "hint": "restart",
+  "detect": {
+    "bin": [
+      "kak"
+    ]
+  },
+  "templates": [
+    {
+      "input": "meander.kak",
+      "output": "$XDG_CONFIG_HOME/kak/colors/meander.kak"
+    }
+  ],
+  "integrate": [
+    {
+      "type": "line",
+      "file": "$XDG_CONFIG_HOME/kak/kakrc",
+      "line": "colorscheme meander",
+      "disable": "^\\s*colorscheme\\s",
+      "create": true
+    }
+  ]
+}

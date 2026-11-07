@@ -1,0 +1,43 @@
+{
+  "name": "Emacs",
+  "category": "editors",
+  "icon": "",
+  "hint": "emacs",
+  "detect": {
+    "bin": [
+      "emacs"
+    ]
+  },
+  "templates": [
+    {
+      "input": "meander-theme.el",
+      "output": "$XDG_CONFIG_HOME/emacs/meander-theme.el",
+      "when": {
+        "path": [
+          "$XDG_CONFIG_HOME/emacs"
+        ]
+      }
+    },
+    {
+      "input": "meander-theme.el",
+      "output": "$HOME/.emacs.d/meander-theme.el",
+      "when": {
+        "path": [
+          "$HOME/.emacs.d"
+        ]
+      }
+    },
+    {
+      "input": "meander-theme.el",
+      "output": "$XDG_CONFIG_HOME/doom/themes/meander-theme.el",
+      "when": {
+        "path": [
+          "$XDG_CONFIG_HOME/doom"
+        ]
+      }
+    }
+  ],
+  "reload": [
+    "command -v emacsclient >/dev/null 2>&1 && timeout 3 emacsclient -e \"(when (custom-theme-enabled-p 'meander) (load-theme 'meander t))\" >/dev/null 2>&1; true"
+  ]
+}

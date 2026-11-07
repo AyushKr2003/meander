@@ -1,0 +1,26 @@
+{
+  "name": "Zellij",
+  "category": "tools",
+  "icon": "",
+  "detect": {
+    "bin": [
+      "zellij"
+    ]
+  },
+  "templates": [
+    {
+      "input": "meander.kdl",
+      "output": "$XDG_CONFIG_HOME/zellij/themes/meander.kdl"
+    }
+  ],
+  "integrate": [
+    {
+      "type": "line",
+      "file": "$XDG_CONFIG_HOME/zellij/config.kdl",
+      "line": "theme \"meander\"",
+      "comment": "//",
+      "disable": "^theme\\s+\"",
+      "create": true
+    }
+  ]
+}

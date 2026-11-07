@@ -1,0 +1,17 @@
+{
+  "name": "Fastfetch",
+  "category": "tools",
+  "icon": "󰍹",
+  "hint": "fastfetch",
+  "detect": {
+    "bin": [
+      "fastfetch"
+    ]
+  },
+  "templates": [
+    {
+      "input": "meander.jsonc",
+      "output": "$XDG_CONFIG_HOME/fastfetch/meander.jsonc"
+    }
+  ]
+}

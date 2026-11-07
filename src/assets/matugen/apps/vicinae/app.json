@@ -1,0 +1,17 @@
+{
+  "name": "Vicinae",
+  "category": "tools",
+  "icon": "󰍉",
+  "hint": "select_in_app",
+  "detect": {
+    "bin": [
+      "vicinae"
+    ]
+  },
+  "templates": [
+    {
+      "input": "meander.toml",
+      "output": "$XDG_DATA_HOME/vicinae/themes/meander.toml"
+    }
+  ]
+}

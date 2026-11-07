@@ -1,0 +1,25 @@
+{
+  "name": "Glow",
+  "category": "tools",
+  "icon": "",
+  "detect": {
+    "bin": [
+      "glow"
+    ]
+  },
+  "templates": [
+    {
+      "input": "meander.json",
+      "output": "$XDG_CONFIG_HOME/glow/meander.json"
+    }
+  ],
+  "integrate": [
+    {
+      "type": "line",
+      "file": "$XDG_CONFIG_HOME/glow/glow.yml",
+      "line": "style: \"$XDG_CONFIG_HOME/glow/meander.json\"",
+      "disable": "^\\s*style\\s*:",
+      "create": true
+    }
+  ]
+}

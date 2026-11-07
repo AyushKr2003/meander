@@ -1,0 +1,10 @@
+{
+  "name": "Serpantinum",
+  "repo": "https://github.com/ilyamiro/serpantinum",
+  "branch": "master",
+  "version": "2.4.2",
+  "tag": "v2.4.2",
+  "commit": "246061b60b770ce0e1756c867aabd0040a995edb",
+  "commitsAfterTag": 10,
+  "date": "2026-11-07"
+}

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Meander mark: a river meander drawn as an "M", with its oxbow lake. Single colour; the shell tints it. -->
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <path d="M 168 790 C 168 330, 430 330, 430 560 C 430 760, 594 760, 594 560 C 594 330, 856 330, 856 790"
+        fill="none" stroke="#000000" stroke-width="84" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="512" cy="292" r="62" fill="#000000"/>
+</svg>

@@ -1,0 +1,18 @@
+{
+  "name": "Vim",
+  "category": "editors",
+  "icon": "",
+  "hint": "neovim",
+  "detect": {
+    "bin": [
+      "vim",
+      "gvim"
+    ]
+  },
+  "templates": [
+    {
+      "input": "meander.vim",
+      "output": "$HOME/.vim/colors/meander.vim"
+    }
+  ]
+}

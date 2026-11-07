@@ -1,0 +1,394 @@
+#!/usr/bin/env bash
+# meander-setup -- install, switch and remove Meander on Omarchy.
+#
+#   install [--dev] [--no-deps] [--no-enable]   copy (or with --dev, link) the
+#                                  plugin, its commands and default settings
+#   enable                         make Meander the Omarchy bar and hand it the
+#                                  desktop engines (notifications, polkit, lock,
+#                                  OSD, dock, background)
+#   disable                        give everything back to Omarchy, exactly as it was
+#   switch [omarchy|meander]       toggle between the two (or pick one)
+#   status                         what runs now
+#   doctor                         look for common problems
+#   update                         pull the source (git) and reinstall
+#   upstream [--log]               how far Meander is behind Serpantinum (upstream.json
+#                                  vs. the latest release and master; --log lists commits)
+#   uninstall [--purge]            disable and remove (--purge: settings too)
+#
+# Every change to ~/.config/omarchy/shell.json is recorded in
+# ~/.local/state/meander/install.json and undone entry by entry: Meander never
+# rewrites a key it didn't set, and never re-enables something it didn't turn off.
+
+set -uo pipefail
+
+SELF="$(realpath "${BASH_SOURCE[0]}")"
+SRC="$(dirname "$(dirname "$SELF")")"
+PLUGIN_ID="meander.bar"
+CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
+CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+PLUGIN_DIR="$CONFIG_HOME/omarchy/plugins/$PLUGIN_ID"
+SHELL_JSON="$CONFIG_HOME/omarchy/shell.json"
+SETTINGS="$CONFIG_HOME/meander/settings.json"
+STATE_DIR="$STATE_HOME/meander"
+RECORD="$STATE_DIR/install.json"
+BIN_DIR="$HOME/.local/bin"
+COMMANDS=(meander meander-core meander-gamma meander-audio meander-setup)
+
+# The Omarchy plugins whose job Meander takes over while it is the bar.
+ENGINES=(omarchy.notifications omarchy.polkit omarchy.lock omarchy.osd omarchy.dock omarchy.background)
+
+# Runtime packages beyond a stock Omarchy (all in Arch's repos).
+DEPS=(matugen pavucontrol satty wf-recorder playerctl swh-plugins qt6-multimedia qt6-imageformats
+      qt6-5compat qt6-svg ffmpeg imagemagick tesseract tesseract-data-eng zbar cava ddcutil
+      brightnessctl gpu-screen-recorder grim slurp wl-clipboard jq fd hyprsunset lm_sensors python)
+
+c_info() { printf '\e[36m::\e[0m %s\n' "$*"; }
+c_ok() { printf '\e[32m✓\e[0m %s\n' "$*"; }
+c_warn() { printf '\e[33m!\e[0m %s\n' "$*" >&2; }
+c_err() { printf '\e[31m✗\e[0m %s\n' "$*" >&2; }
+die() { c_err "$*"; exit 1; }
+
+record_get() { jq -r "$1" "$RECORD" 2>/dev/null; }
+record_set() {
+    mkdir -p "$STATE_DIR"
+    [[ -s $RECORD ]] || echo '{}' > "$RECORD"
+    local tmp="$RECORD.tmp.$$"
+    jq "$@" "$RECORD" > "$tmp" && mv -f "$tmp" "$RECORD"
+}
+
+shell_json_edit() {
+    [[ -f $SHELL_JSON ]] || echo '{}' > "$SHELL_JSON"
+    local tmp="$SHELL_JSON.meander.$$"
+    if jq "$@" "$SHELL_JSON" > "$tmp" && jq -e . "$tmp" >/dev/null; then
+        # Keep the file's mode (Omarchy writes it 600) and replace atomically.
+        chmod --reference="$SHELL_JSON" "$tmp" 2>/dev/null
+        mv -f "$tmp" "$SHELL_JSON"
+    else
+        rm -f "$tmp"
+        die "could not update $SHELL_JSON (left unchanged)"
+    fi
+}
+
+require_omarchy() {
+    command -v omarchy-shell >/dev/null 2>&1 || die "omarchy-shell not found: Meander needs Omarchy (https://omarchy.org)"
+    [[ -n ${OMARCHY_PATH:-} && -d $OMARCHY_PATH/shell ]] || die "OMARCHY_PATH is not set; run this from your Omarchy session"
+}
+
+# ---------------------------------------------------------------- deps
+install_deps() {
+    local missing=() p
+    for p in "${DEPS[@]}"; do
+        pacman -Q "$p" >/dev/null 2>&1 || missing+=("$p")
+    done
+    if (( ${#missing[@]} == 0 )); then
+        c_ok "dependencies already installed"
+        return 0
+    fi
+    c_info "installing: ${missing[*]}"
+    if [[ -t 0 ]] && command -v omarchy-pkg-add >/dev/null 2>&1; then
+        omarchy-pkg-add "${missing[@]}"
+    elif [[ -t 0 ]]; then
+        sudo pacman -S --needed --noconfirm "${missing[@]}"
+    else
+        # No terminal for a password prompt (launched from the shell or an agent).
+        pkexec pacman -S --needed --noconfirm "${missing[@]}"
+    fi || c_warn "some packages failed to install; run 'meander doctor' to see what is missing"
+}
+
+# ---------------------------------------------------------------- files
+install_files() {
+    local dev="$1" cmd
+    mkdir -p "$(dirname "$PLUGIN_DIR")" "$BIN_DIR"
+    if [[ $dev == 1 ]]; then
+        [[ -L $PLUGIN_DIR || ! -e $PLUGIN_DIR ]] || rm -rf "$PLUGIN_DIR"
+        ln -sfn "$SRC" "$PLUGIN_DIR"
+        c_ok "linked $PLUGIN_DIR -> $SRC (dev)"
+    else
+        [[ -L $PLUGIN_DIR ]] && rm -f "$PLUGIN_DIR"
+        mkdir -p "$PLUGIN_DIR"
+        rsync -a --delete --exclude .git --exclude '__pycache__' "$SRC/" "$PLUGIN_DIR/"
+        c_ok "installed to $PLUGIN_DIR"
+    fi
+    for cmd in "${COMMANDS[@]}"; do
+        ln -sfn "$PLUGIN_DIR/bin/$cmd" "$BIN_DIR/$cmd"
+    done
+    c_ok "commands linked in $BIN_DIR (${COMMANDS[*]})"
+    record_set --arg src "$SRC" --argjson dev "$dev" --arg v "$(jq -r .version "$SRC/manifest.json")" \
+        '.source = $src | .dev = ($dev == 1) | .version = $v'
+}
+
+# The Icon= of a desktop entry (Omarchy's wrappers, such as omarchy-browser,
+# have no icon of their own name).
+desktop_icon() {
+    local id="$1" f
+    for f in "$HOME/.local/share/applications/$id.desktop" "/usr/share/applications/$id.desktop"; do
+        [[ -f $f ]] && { grep -m1 '^Icon=' "$f" | cut -d= -f2-; return; }
+    done
+    echo "$id"
+}
+
+# First run only: upstream's defaults, tuned for Omarchy. An existing
+# settings.json is never touched.
+install_settings() {
+    [[ -f $SETTINGS ]] && { c_ok "keeping your settings ($SETTINGS)"; return 0; }
+    mkdir -p "$(dirname "$SETTINGS")"
+    local font term browser files_id
+    font=$(omarchy-font-current 2>/dev/null || echo "JetBrainsMono Nerd Font")
+    term=$(omarchy-default-terminal 2>/dev/null | sed 's/\.desktop$//' || true)
+    # omarchy-browser.desktop (the xdg default) is a hidden wrapper; ask Omarchy
+    # which browser it opens.
+    browser=$(omarchy-default-browser 2>/dev/null | sed "s/\.desktop$//" || true)
+    files_id=$(xdg-mime query default inode/directory 2>/dev/null | sed 's/\.desktop$//' || true)
+    term=${term:-Alacritty}; browser=${browser:-chromium}; files_id=${files_id:-org.gnome.Nautilus}
+    # Omarchy themes the apps itself, so Meander's app theming starts empty
+    # (opt in per app under Settings > Theme > Apps); no idle engine of its
+    # own (Omarchy's runs); wallpapers from the current Omarchy theme.
+    jq --arg font "$font" --arg wp "$STATE_HOME/omarchy/current/theme/backgrounds" \
+       --arg term "$term" --arg browser "$browser" --arg files "$files_id" \
+       --arg termIcon "$(desktop_icon "$term")" --arg browserIcon "$(desktop_icon "$browser")" --arg filesIcon "$(desktop_icon "$files_id")" '
+        .theme = (.theme + {activePreset: "Omarchy", matugen: false, omarchy: true, fontFamily: $font, apps: [], pureBlack: false, materialVariant: "tonalspot"})
+        | .idle.enabled = false
+        | .notifications.dnd = false
+        | .display = {monitors: {}}
+        | .wallpaperDir = $wp
+        | .omarchy = {followBackground: true, batteryAlerts: false}
+        | .dock.apps = [
+            {name: "Terminal", desktop_id: $term, icon: $termIcon},
+            {name: "Browser", desktop_id: $browser, icon: $browserIcon},
+            {name: "Files", desktop_id: $files, icon: $filesIcon}
+          ]' "$SRC/config/meander/settings.json" > "$SETTINGS"
+    c_ok "wrote default settings ($SETTINGS)"
+}
+
+# ---------------------------------------------------------------- enable/disable
+engine_ids() {
+    # The stock engines plus any enabled clone of one (`omarchy plugin clone`,
+    # or another shell's handover copy such as Omacale's).
+    local ids=("${ENGINES[@]}") clones
+    clones=$(omarchy plugin list --json 2>/dev/null | jq -r --argjson e "$(printf '%s\n' "${ENGINES[@]}" | jq -R . | jq -s .)" \
+        '.[] | select(.enabled == true and ((.clonedFrom // "") as $c | $e | index($c))) | .id' 2>/dev/null)
+    [[ -n $clones ]] && ids+=($clones)
+    printf '%s\n' "${ids[@]}"
+}
+
+do_enable() {
+    require_omarchy
+    [[ -e $PLUGIN_DIR/manifest.json ]] || die "Meander is not installed; run ./install.sh first"
+    local current added ids
+    current=$(jq -r '.bar.id // "omarchy.bar"' "$SHELL_JSON" 2>/dev/null)
+    if [[ $current != "$PLUGIN_ID" ]]; then
+        record_set --arg b "$current" '.previousBar = $b'
+    fi
+    ids=$(engine_ids | jq -R . | jq -s 'unique')
+    added=$(jq -c --argjson ids "$ids" '($ids - (.disabledPlugins // []))' "$SHELL_JSON")
+    # Merge with what an earlier enable already recorded, so a second enable
+    # never forgets an entry it has to give back.
+    record_set --argjson a "$added" '.addedDisabled = (((.addedDisabled // []) + $a) | unique)'
+    shell_json_edit --arg id "$PLUGIN_ID" --argjson ids "$ids" \
+        '.bar = ((.bar // {}) + {id: $id})
+         | .disabledPlugins = ((.disabledPlugins // []) as $d | $d + [$ids[] | select(. as $i | $d | index($i) | not)])'
+    c_ok "Meander is the Omarchy bar (was: $current)"
+    [[ $added != "[]" ]] && c_ok "handed over: $(jq -r 'join(", ")' <<<"$added")"
+    omarchy-shell -q shell rescanPlugins >/dev/null 2>&1 || true
+}
+
+do_disable() {
+    local prev added current
+    current=$(jq -r '.bar.id // "omarchy.bar"' "$SHELL_JSON" 2>/dev/null)
+    prev=$(record_get '.previousBar // "omarchy.bar"')
+    added=$(record_get '.addedDisabled // []')
+    [[ -n $added ]] || added='[]'
+    if [[ $current == "$PLUGIN_ID" ]]; then
+        if [[ $prev == "omarchy.bar" ]]; then
+            shell_json_edit 'if .bar then .bar |= del(.id) else . end'
+        else
+            shell_json_edit --arg b "$prev" '.bar.id = $b'
+        fi
+        c_ok "bar handed back to $prev"
+    fi
+    shell_json_edit --argjson a "$added" '.disabledPlugins = ((.disabledPlugins // []) - $a)'
+    [[ $added != "[]" ]] && c_ok "re-enabled: $(jq -r 'join(", ")' <<<"$added")"
+    record_set '.addedDisabled = []'
+    # Meander's own helpers outlive nothing.
+    "$PLUGIN_DIR/bin/meander-audio" stop >/dev/null 2>&1 || true
+    "$PLUGIN_DIR/bin/meander-gamma" quit >/dev/null 2>&1 || true
+}
+
+do_switch() {
+    local to="${1:-}" current
+    current=$(jq -r '.bar.id // "omarchy.bar"' "$SHELL_JSON" 2>/dev/null)
+    if [[ -z $to ]]; then
+        [[ $current == "$PLUGIN_ID" ]] && to=omarchy || to=meander
+    fi
+    case "$to" in
+        meander) do_enable ;;
+        omarchy) do_disable ;;
+        *) die "switch: expected 'omarchy' or 'meander'" ;;
+    esac
+}
+
+do_status() {
+    local current
+    current=$(jq -r '.bar.id // "omarchy.bar"' "$SHELL_JSON" 2>/dev/null)
+    echo "active bar:   $current"
+    echo "installed:    $( [[ -L $PLUGIN_DIR ]] && echo "dev link -> $(readlink "$PLUGIN_DIR")" || { [[ -d $PLUGIN_DIR ]] && echo "$PLUGIN_DIR" || echo no; } )"
+    echo "version:      $(jq -r .version "$PLUGIN_DIR/manifest.json" 2>/dev/null || echo -)"
+    echo "handed over:  $(record_get '(.addedDisabled // []) | join(", ")')"
+    echo "previous bar: $(record_get '.previousBar // "omarchy.bar"')"
+}
+
+do_doctor() {
+    local bad=0 p cmd
+    require_omarchy
+    for p in "${DEPS[@]}"; do
+        pacman -Q "$p" >/dev/null 2>&1 || { c_warn "missing package: $p"; bad=1; }
+    done
+    [[ -f $PLUGIN_DIR/manifest.json ]] && c_ok "plugin installed" || { c_err "plugin not installed ($PLUGIN_DIR)"; bad=1; }
+    for cmd in "${COMMANDS[@]}"; do
+        command -v "$cmd" >/dev/null 2>&1 || { c_warn "$cmd is not on PATH (expected in $BIN_DIR)"; bad=1; }
+    done
+    local current
+    current=$(jq -r '.bar.id // "omarchy.bar"' "$SHELL_JSON" 2>/dev/null)
+    if [[ $current == "$PLUGIN_ID" ]]; then
+        local id
+        for id in $(engine_ids); do
+            jq -e --arg id "$id" '(.disabledPlugins // []) | index($id)' "$SHELL_JSON" >/dev/null ||
+                c_warn "$id is still on: Meander leaves that job to it (run 'meander enable' to hand it over)"
+        done
+    else
+        # Handed-over engines with Meander not running would leave the desktop
+        # without notifications or a lock screen.
+        local added
+        added=$(record_get '(.addedDisabled // []) | length')
+        [[ ${added:-0} -gt 0 ]] && { c_err "Meander isn't the bar but Omarchy's engines are still off: run 'meander disable'"; bad=1; }
+    fi
+    if command -v qs >/dev/null 2>&1; then
+        local errs
+        errs=$(timeout 5 qs log -p "$OMARCHY_PATH/shell" 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -iE "meander" | grep -iE "error|unavailable|failed to load|is not a type" | tail -5)
+        [[ -n $errs ]] && { c_warn "recent Meander errors in the shell log:"; echo "$errs" >&2; bad=1; }
+    fi
+    (( bad == 0 )) && c_ok "everything looks right"
+    return $bad
+}
+
+# Meander's version is upstream's release plus a port revision (2.4.2-1 is
+# the first Meander release on Serpantinum 2.4.2); upstream.json records the
+# exact commit it was ported from. This compares that with upstream now: from
+# a Serpantinum checkout when there is one ($MEANDER_UPSTREAM_DIR, else
+# ../serpantinum next to the source), else from GitHub's API.
+do_upstream() {
+    local log=0 meta="$SRC/upstream.json" repo base tag ver after date short
+    [[ ${1:-} == --log ]] && log=1
+    [[ -f $meta ]] || die "upstream.json not found in $SRC"
+    repo=$(jq -r .repo "$meta"); base=$(jq -r .commit "$meta"); tag=$(jq -r .tag "$meta")
+    ver=$(jq -r .version "$meta"); after=$(jq -r '.commitsAfterTag // 0' "$meta"); date=$(jq -r '.date // ""' "$meta")
+    local branch; branch=$(jq -r '.branch // "master"' "$meta")
+    short=${base:0:7}
+    echo "Meander $(jq -r .version "$SRC/manifest.json")"
+    echo "based on:  Serpantinum $tag$( (( after > 0 )) && echo " +$after") ($short${date:+, $date})"
+
+    local latest head behind="" commits=""
+    latest=$(timeout 15 git ls-remote --tags --refs "$repo" 2>/dev/null | awk -F/ '{print $NF}' | grep -E '^v?[0-9]+(\.[0-9]+)*$' | sort -V | tail -n1)
+    head=$(timeout 15 git ls-remote "$repo" "refs/heads/$branch" 2>/dev/null | cut -c1-40)
+    [[ -n $head ]] || { c_warn "couldn't reach $repo"; return 1; }
+    echo "upstream:  latest release ${latest:-?}, $branch ${head:0:7}"
+
+    local dir="${MEANDER_UPSTREAM_DIR:-$(dirname "$SRC")/serpantinum}"
+    if [[ -d $dir/.git ]] && git -C "$dir" remote get-url origin 2>/dev/null | grep -q "${repo#https://}"; then
+        git -C "$dir" fetch --quiet origin "$branch" 2>/dev/null
+        if git -C "$dir" cat-file -e "$base^{commit}" 2>/dev/null; then
+            behind=$(git -C "$dir" rev-list --count "$base..origin/$branch")
+            (( log )) && commits=$(git -C "$dir" log --format='  %h %cs %s' "$base..origin/$branch")
+        fi
+    fi
+    if [[ -z $behind ]]; then
+        local api="https://api.github.com/repos/${repo#https://github.com/}/compare/$base...$branch"
+        local json; json=$(timeout 15 curl -fsSL -H 'Accept: application/vnd.github+json' "$api" 2>/dev/null)
+        behind=$(jq -r '.ahead_by // empty' <<<"$json" 2>/dev/null)
+        (( log )) && commits=$(jq -r '.commits[]? | "  \(.sha[0:7]) \(.commit.committer.date[0:10]) \(.commit.message | split("\n")[0])"' <<<"$json" 2>/dev/null)
+    fi
+
+    if [[ $behind == 0 ]]; then
+        c_ok "up to date with $branch"
+    elif [[ -n $behind ]]; then
+        c_warn "$behind commit(s) behind $branch"
+    else
+        c_warn "couldn't count commits (no checkout, GitHub API unreachable)"
+    fi
+    if [[ -n $latest && "v$ver" != "$latest" && "$ver" != "$latest" ]]; then
+        local newest; newest=$(printf '%s\n%s\n' "${tag}" "$latest" | sort -V | tail -n1)
+        [[ $newest == "$latest" ]] && c_warn "a newer release is out: $latest (Meander is on $tag)"
+    fi
+    [[ -n $commits ]] && { echo "commits since the base:"; echo "$commits"; }
+    return 0
+}
+
+do_install() {
+    local dev=0 deps=1 enable=1 a
+    for a in "$@"; do
+        case "$a" in
+            --dev) dev=1 ;;
+            --no-deps) deps=0 ;;
+            --no-enable) enable=0 ;;
+            *) die "install: unknown option $a" ;;
+        esac
+    done
+    require_omarchy
+    command -v quickshell >/dev/null 2>&1 || die "quickshell not found"
+    (( deps )) && install_deps
+    install_files "$dev"
+    install_settings
+    (( enable )) && do_enable
+    c_ok "Meander $(jq -r .version "$SRC/manifest.json") is ready. Keybinds: see $PLUGIN_DIR/keybinds.lua"
+}
+
+do_update() {
+    local src dev
+    src=$(record_get '.source // empty')
+    dev=$(record_get '.dev // false')
+    [[ -n $src && -d $src ]] || src="$SRC"
+    if [[ -d $src/.git ]]; then
+        c_info "pulling $src"
+        git -C "$src" pull --ff-only || die "git pull failed; resolve it in $src and run 'meander update' again"
+    else
+        c_warn "$src is not a git checkout; reinstalling it as it is"
+    fi
+    if [[ $dev == true ]]; then
+        "$src/bin/meander-setup" install --dev --no-enable
+    else
+        "$src/bin/meander-setup" install --no-enable
+    fi
+}
+
+do_uninstall() {
+    local purge=0 cmd
+    [[ ${1:-} == --purge ]] && purge=1
+    do_disable
+    for cmd in "${COMMANDS[@]}"; do
+        [[ -L $BIN_DIR/$cmd ]] && rm -f "$BIN_DIR/$cmd"
+    done
+    if [[ -L $PLUGIN_DIR ]]; then rm -f "$PLUGIN_DIR"; elif [[ -d $PLUGIN_DIR ]]; then rm -rf "$PLUGIN_DIR"; fi
+    c_ok "removed the plugin and its commands"
+    if (( purge )); then
+        rm -rf "$CONFIG_HOME/meander" "$STATE_DIR" "$CACHE_HOME/meander" "${XDG_RUNTIME_DIR:-/tmp}/meander"
+        c_ok "removed Meander's settings, state and cache"
+    else
+        echo "Your settings stay in $CONFIG_HOME/meander (remove with: meander-setup uninstall --purge)"
+    fi
+}
+
+cmd="${1:-}"; [[ -n $cmd ]] && shift
+case "$cmd" in
+    install) do_install "$@" ;;
+    enable) do_enable ;;
+    disable) do_disable ;;
+    switch) do_switch "${1:-}" ;;
+    status) do_status ;;
+    doctor) do_doctor ;;
+    update) do_update ;;
+    upstream) do_upstream "${1:-}" ;;
+    uninstall) do_uninstall "${1:-}" ;;
+    -h|--help|help|"") sed -n '2,21p' "$SELF" | sed 's/^# \{0,1\}//' ;;
+    *) die "unknown command: $cmd (try --help)" ;;
+esac

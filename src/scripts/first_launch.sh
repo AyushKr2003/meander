@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+
+SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+MEANDER_DIR="$(dirname "$SCRIPT_DIR")"
+
+source "$SCRIPT_DIR/caching.sh" 2>/dev/null || true
+source "$SCRIPT_DIR/config.sh" 2>/dev/null || true
+
+STATE_DIR="${QS_STATE_DIR:-$HOME/.local/state/meander}"
+FLAG_FILE="$STATE_DIR/first_launch.done"
+
+check_status() {
+    mkdir -p "$STATE_DIR"
+    if [ -f "$FLAG_FILE" ]; then
+        echo "SKIP"
+        exit 0
+    fi
+
+    touch "$FLAG_FILE"
+
+    WP_DIR=""
+    if type get_setting >/dev/null 2>&1; then
+        WP_DIR="$(get_setting "wallpaperDir" "")"
+        [ -z "$WP_DIR" ] && WP_DIR="$(get_setting "wallpaper_dir" "")"
+    fi
+
+    # Start from the background Omarchy shows now, not a random one.
+    RANDOM_WP="$(readlink -f "${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/current/background" 2>/dev/null)"
+    [ -f "$RANDOM_WP" ] || RANDOM_WP=""
+    if [ -z "$RANDOM_WP" ] && [ -n "$WP_DIR" ] && [ -d "$WP_DIR" ]; then
+        RANDOM_WP="$(find "$WP_DIR" -maxdepth 1 -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" -o -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.mov" -o -iname "*.webm" \) 2>/dev/null | shuf -n 1)"
+    fi
+
+    START_QML=""
+    if [ -f "$MEANDER_DIR/quickshell/intro/Start.qml" ]; then
+        START_QML="$MEANDER_DIR/quickshell/intro/Start.qml"
+    elif [ -f "$MEANDER_DIR/quickshell/Start.qml" ]; then
+        START_QML="$MEANDER_DIR/quickshell/Start.qml"
+    else
+        START_QML="$(find "$MEANDER_DIR/quickshell" -type f -name "Start.qml" 2>/dev/null | head -n 1)"
+    fi
+
+    echo "FIRST|$RANDOM_WP|$START_QML"
+}
+
+open_guide() {
+    local script_path="$MEANDER_DIR/scripts/qs_manager.sh"
+    if [ -f "$script_path" ]; then
+        bash "$script_path" open settings welcome
+    fi
+}
+
+reset_state() {
+    rm -f "$FLAG_FILE"
+}
+
+case "$1" in
+    --check)
+        check_status
+        ;;
+    --open-guide)
+        open_guide
+        ;;
+    --reset)
+        reset_state
+        ;;
+    *)
+        exit 1
+        ;;
+esac

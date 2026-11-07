@@ -1,0 +1,17 @@
+{
+  "name": "Claude Code",
+  "category": "tools",
+  "icon": "󰚩",
+  "hint": "select_in_app",
+  "detect": {
+    "bin": [
+      "claude"
+    ]
+  },
+  "templates": [
+    {
+      "input": "meander.json",
+      "output": "$HOME/.claude/themes/meander.json"
+    }
+  ]
+}

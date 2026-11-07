@@ -1,0 +1,25 @@
+{
+  "name": "Zathura",
+  "category": "tools",
+  "icon": "",
+  "hint": "restart",
+  "detect": {
+    "bin": [
+      "zathura"
+    ]
+  },
+  "templates": [
+    {
+      "input": "meander",
+      "output": "$XDG_CONFIG_HOME/zathura/meander"
+    }
+  ],
+  "integrate": [
+    {
+      "type": "line",
+      "file": "$XDG_CONFIG_HOME/zathura/zathurarc",
+      "line": "include meander",
+      "create": true
+    }
+  ]
+}
