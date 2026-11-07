@@ -63,10 +63,37 @@ pcall(dofile, os.getenv("HOME") .. "/.config/omarchy/plugins/meander.bar/keybind
 
 It binds SUPER + ALT + A (launcher), V (clipboard), Q (quick settings),
 O (notifications), M (music), N (network), U (volume), C (calendar),
-W (wallpapers), H (settings), Z (bar autohide), X (screenshot) and T
+W (wallpapers), P (theme picker), H (settings), Z (bar autohide), X (screenshot) and T
 (desktop widgets), all free in a stock Omarchy. Commented `o.rebind` lines
-at the bottom hand SUPER + SPACE, SUPER + CTRL + V, PRINT and SUPER + ESCAPE
-to Meander too.
+at the bottom hand SUPER + SPACE, SUPER + CTRL + V, SUPER + CTRL + SPACE,
+SUPER + CTRL + T (theme menu), PRINT and SUPER + ESCAPE to Meander too.
+
+The theme picker (`meander msg toggle themes`) shows Omarchy's themes the way
+the wallpaper picker shows wallpapers: ← → (or h l, the wheel) to browse,
+Enter or a click to apply (`omarchy-theme-set`), `/` to search. It stays open,
+so you can try the next one.
+
+### Keyboard navigation
+
+Every popout, the bar and the dock can be driven without the mouse. The
+cursor appears on the first key press (or right away when the keyboard opened
+the panel) and disappears when you move the mouse.
+
+| Key | Action |
+|---|---|
+| arrows, `h` `j` `k` `l` | Move to the nearest control in that direction |
+| `Tab` / `Shift + Tab` | Next / previous control in reading order |
+| `Home` / `End` | First / last control |
+| `Enter` / `Space` | Activate (a click) |
+| `Menu` / `Shift + F10` | Secondary action (a right click: tray and dock menus, quick-setting pages) |
+| `←` `→` on a slider | Change it by 5% (`Shift`: by one step); `↑` `↓` on a vertical one |
+| `Ctrl + Tab` / `Ctrl + Shift + Tab` | Next / previous popout; on the bar, go to the dock and back |
+| `Escape` | Close the popout, or give the keyboard back from the bar / dock |
+
+`keybinds.lua` binds SUPER + CTRL + 0 to bar focus (`meander keys bar`). From
+there, a module that opens a popout hands the keyboard to it. Settings keeps
+its own keys (arrows and Tab change tabs, `/` searches); `Enter` steps into the
+page's controls, `↑` `↓` walk them, and `Escape` steps back out.
 
 `meander.lua` is Serpantinum's Hyprland look (borderless windows, 4/6px gaps,
 light blur, no shadow, its pop-in animations), with window corners that follow
@@ -83,8 +110,10 @@ pcall(dofile, os.getenv("HOME") .. "/.config/omarchy/plugins/meander.bar/meander
 meander enable | disable | switch [omarchy|meander]
 meander status | doctor | update | uninstall [--purge]
 meander upstream [--log] # how far behind Serpantinum's release and master it is
-meander msg toggle <launcher|clipboard|system|notifications|music|network|volume|calendar|wallpaper>
+meander msg toggle <launcher|clipboard|system|notifications|music|network|volume|calendar|wallpaper|themes>
 meander settings [tab]
+meander keys bar|dock|off   # bar / dock take the keyboard (Escape gives it back)
+meander keys open <panel>   # open a popout with the keyboard cursor on
 meander screenshot [--edit|--full|--record|--ocr|--qr]
 meander lock | redactor | lock-redactor
 meander config get|set|dump|path|edit

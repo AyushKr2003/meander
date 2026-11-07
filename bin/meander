@@ -87,6 +87,8 @@ show_help() {
     echo "  settings [tab]               $(t "cli.settings_desc")"
     echo "  msg <action|workspace> ...  $(t "cli.msg_desc")"
     echo "  ipc ...                      $(t "cli.ipc_desc")"
+    echo "  keys bar|dock|off            Drive the bar or dock with the keyboard (Escape leaves)"
+    echo "  keys open <panel>            Open a popout with the keyboard cursor on"
     echo "  enable                       Make Meander the Omarchy bar and hand it the desktop"
     echo "  disable | kill               Give the desktop back to Omarchy's own bar"
     echo "  switch [omarchy|meander]     Toggle between the two without uninstalling"
@@ -750,6 +752,15 @@ case "$1" in
     brightness)
         shift
         exec meander-core brightness "$@"
+        ;;
+    keys)
+        # Full keyboard mode (src/quickshell/keynav): bar / dock focus, or a
+        # popout opened with the cursor already on.
+        case "${2:-}" in
+            bar|dock|off) cli_ipc keys "$2"; exit $? ;;
+            open) [[ -n "${3:-}" ]] || cli_usage "keys open <panel>"; cli_ipc keys open "$3" "${4:-}"; exit $? ;;
+            *) cli_usage "keys bar|dock|off|open <panel>" ;;
+        esac
         ;;
 esac
 

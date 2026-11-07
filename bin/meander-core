@@ -13,6 +13,7 @@
 #   screentime track|stats DATE [--app CLASS] [--db-dir DIR]
 #   launcher rank|log NAME|files QUERY
 #   monitors
+#   themes
 #   system can-hibernate|fingerprint
 #   clipboard list|decode|copy|pin|delete|wipe ... [--cache-dir DIR]
 
@@ -24,7 +25,7 @@ CORE="$ROOT/src/scripts/core"
 PY=(python3 -I)
 
 usage() {
-    sed -n '2,17p' "$SELF" | sed 's/^# \{0,1\}//'
+    sed -n '2,18p' "$SELF" | sed 's/^# \{0,1\}//'
 }
 
 # ---------------------------------------------------------------- brightness
@@ -179,6 +180,7 @@ case "$cmd" in
     screentime) exec "${PY[@]}" "$CORE/screentime.py" "$@" ;;
     launcher) exec "${PY[@]}" "$CORE/launcher.py" "$@" ;;
     clipboard) exec "${PY[@]}" "$CORE/clipboard.py" "$@" ;;
+    themes) exec "${PY[@]}" "$CORE/themes.py" "$@" ;;
     monitors) cmd_monitors ;;
     system) cmd_system "$@" ;;
     quit) pkill -f "$CORE/screentime.py track" 2>/dev/null; exit 0 ;;

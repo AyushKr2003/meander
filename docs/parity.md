@@ -1,6 +1,6 @@
 # Parity with Serpantinum
 
-Meander 2.4.2-1 against Serpantinum 2.4.2 (+10 commits, `246061b`), module by module. Run `meander upstream --log` to see what upstream has added since.
+Meander 2.4.2-2 against Serpantinum 2.4.2 (+10 commits, `246061b`), module by module. Run `meander upstream --log` to see what upstream has added since.
 
 - **Same**: upstream's code and UI, unchanged apart from the rename.
 - **Omarchy**: same UI, backed by Omarchy instead of upstream's own service.
@@ -34,6 +34,8 @@ Meander 2.4.2-1 against Serpantinum 2.4.2 (+10 commits, `246061b`), module by mo
 | Weather, location, calendar | Same | |
 | Media (MPRIS, lyrics, art, visualiser) | Same | |
 | Translations (23 languages) | Same | |
+| Theme picker (`themes` popout) | Meander only | Omarchy themes in the wallpaper picker's carousel (same cards, skew, motion, top bar); rows from `omarchy-theme-switcher --print-rows`, palettes from each `colors.toml` (`meander-core themes`), applied with `omarchy-theme-set` |
+| Keyboard navigation (popouts, bar focus, dock focus) | Meander only | Upstream is pointer-only. A cursor over each surface's controls (arrows/hjkl spatial, Tab reading order, Enter click, Menu right click, sliders on arrows, Ctrl+Tab between panels); Settings keeps upstream's keys and gains a visible focus ring and Enter into the page |
 
 ## Native helpers
 
@@ -55,6 +57,11 @@ Meander 2.4.2-1 against Serpantinum 2.4.2 (+10 commits, `246061b`), module by mo
 - The EasyEffects migration, which disabled EasyEffects' autostart.
 
 ## Upstream bugs fixed on the way
+
+- `ClickButton`/`IconButton` Enter called their MouseArea's `clicked({button})`; the
+  object arrives as null, so the handler threw and Enter did nothing.
+- Settings' shortcuts (Ctrl+Tab, Ctrl+K, Ctrl+Q) stayed live while it was hidden in
+  the popout cache, colliding with other popouts' keys.
 
 - Wallpaper thumbnailing converted `.webp` sources to `.jpg` and deleted the
   originals in the wallpaper folder (it would have deleted Omarchy theme files).

@@ -196,18 +196,19 @@ Item {
                         TrayMenuController.itemExited();
                     }
 
+                    // Meander: keyboard clicks (KeyNav) come with no event; see KeyNavState.buttonOf.
                     onClicked: mouse => {
-                        if (mouse.button === Qt.LeftButton) {
+                        if (KeyNavState.buttonOf(mouse) === Qt.LeftButton) {
                             if (modelData.isMenuOnly || modelData.onlyMenu) {
                                 trayIcon.openMenu("toggle");
                             } else if (typeof modelData.activate === "function") {
                                 modelData.activate();
                             }
-                        } else if (mouse.button === Qt.MiddleButton) {
+                        } else if (KeyNavState.buttonOf(mouse) === Qt.MiddleButton) {
                             if (typeof modelData.secondaryActivate === "function") {
                                 modelData.secondaryActivate();
                             }
-                        } else if (mouse.button === Qt.RightButton) {
+                        } else if (KeyNavState.buttonOf(mouse) === Qt.RightButton) {
                             if (modelData.menu) {
                                 trayIcon.openMenu("toggle");
                             } else if (typeof modelData.contextMenu === "function") {

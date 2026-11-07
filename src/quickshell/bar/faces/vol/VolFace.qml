@@ -112,8 +112,9 @@ BarFaceBase {
         cursorShape: Qt.PointingHandCursor
         enabled: root.volStyle === "text" && !root.isPreview
         acceptedButtons: Qt.LeftButton | Qt.RightButton
+        // Meander: keyboard clicks (KeyNav) come with no event; see KeyNavState.buttonOf.
         onClicked: mouse => {
-            if (mouse.button === Qt.RightButton) {
+            if (KeyNavState.buttonOf(mouse) === Qt.RightButton) {
                 if (Audio.defaultSink) Audio.toggleMute(Audio.defaultSink)
             } else {
                 Quickshell.execDetached(["bash", "-c", Caching.meanderDir + "/scripts/qs_manager.sh toggle volume"])

@@ -4,6 +4,21 @@ What changed in each version of Meander, newest first. Versions are the ones in 
 
 Meander's version is the Serpantinum release it is built on plus a port revision: `2.4.2-1` is the first Meander release on Serpantinum 2.4.2, `2.4.2-2` a Meander-only change on the same base, and `2.4.3-1` the first release after merging Serpantinum 2.4.3. `upstream.json` holds the exact upstream commit; `meander upstream` shows how far behind Serpantinum's latest release and master it is.
 
+## 2.4.2-2 - 2026-11-07
+
+Upstream base: unchanged (Serpantinum v2.4.2 +10 commits, `246061b`).
+
+### Added
+- **keyboard**: full keyboard mode for every popout: arrows or h/j/k/l move to the nearest control, Tab walks them in reading order, Enter/Space clicks, Menu/Shift+F10 right-clicks, Left/Right change a slider, Ctrl+Tab goes to the next popout. An accent focus ring follows the cursor; moving the mouse hides it
+- **keyboard**: bar focus (`meander keys bar`, SUPER + CTRL + 0 in `keybinds.lua`) and dock focus (`meander keys dock`, Ctrl+Tab from the bar): drive the bar or dock from the keyboard; a module that opens a popout hands the keyboard to it, Escape gives it back
+- **keyboard**: `meander keys open <panel>` opens a popout with the cursor already on
+- **keyboard**: Settings shows a focus ring on the focused control, and Enter steps into a page's controls
+- **themes**: a theme picker (`meander msg toggle themes`, SUPER + ALT + P in `keybinds.lua`, optional rebinds of Omarchy's theme keys): Omarchy's themes in the wallpaper picker's carousel, with each theme's palette, search, and apply on Enter or click
+
+### Fixed
+- **buttons**: Enter on a focused button did nothing (the click handler got no mouse event and threw)
+- **settings**: its Ctrl+Tab, Ctrl+K and Ctrl+Q shortcuts stayed active while Settings was closed, taking those keys from the other popouts
+
 ## 2.4.2-1 - 2026-11-07
 
 Upstream base: Serpantinum v2.4.2 +10 commits (`246061b`), master at the time.

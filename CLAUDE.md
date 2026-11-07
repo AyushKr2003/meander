@@ -67,6 +67,8 @@ Order of preference: an Omarchy command or IPC (`omarchy-*`, `omarchy-shell <tar
 | Early notifications | `manifest.json` also declares kind `service` (`MeanderService.qml`): created synchronously after the plugin scan, seconds before the async bar, and shares the `NotificationManager` singleton with it (one engine, same file URL). Ownership before the bar gets the registry comes from `shell.json` (`OmarchyHost.fileOwns`) |
 | Bar hide | `~/.local/state/omarchy/toggles/bar-off` + `omarchy.bar syncHidden` |
 | Panel hotkeys | host contract `summonBarWidget/hideBarWidget/isBarWidgetOpen` mapped in `MeanderBar.widgetTargets` |
+| Theme picker | `themepicker/ThemePicker.qml` (registry `themes`, laid out as `wallpaper`): `meander-core themes` (`scripts/core/themes.py`: Omarchy's `omarchy-theme-switcher --print-rows` + palettes from `colors.toml`), apply `omarchy-theme-set <id>`, current from `theme.name` |
+| Keyboard navigation | none upstream (pointer-only). `keynav/KeyNav.qml` (+ pure `KeyNavLogic.js`, `node tests/keynav.test.js`) walks a surface for stops on every key: PointingHand MouseAreas, `activeFocusOnTab` items, sliders, text fields; opt in/out with `keyNavTarget`, `keyNavSkip`, `keyNavActivate()`. Wired into `Main.qml` (popouts; Settings only gets the ring, `followFocus`), `bar/Bar.qml` and `dock/DockWindow.qml` (Exclusive keyboard while focused). `KeyNavState` holds bar/dock focus and the popout hand-off; IPC `meander.keys` (`meander keys ...`) |
 
 ### 3. Engines: one owner at a time
 
@@ -101,6 +103,8 @@ meander doctor
 
 Gotchas:
 
+- Keyboard clicks emit `MouseArea.clicked(null)`: QML can't build a MouseEvent. A handler that reads `mouse.button` must use `KeyNavState.buttonOf(mouse)` (new upstream handlers too). Don't import `QtTest` for real synthetic events.
+- Restarting the shell can crash quickshell in its type loader (`QQmlImports::resolveType` → `QDir` compare) or stall it at "Configuration Loaded"; it predates Meander's keyboard work. A crash retries by itself; a stall needs that one PID killed (`omarchy-restart-shell` can't, its kill goes over IPC). Restart sparingly while the user is working.
 - `omarchy-restart-shell` needs `HYPRLAND_INSTANCE_SIGNATURE`, or it stops the shell and can't start it again.
 - A QML load error makes the host fall back to `omarchy.bar` ("bar option meander.bar failed to load") while Meander's engines may still be handed over: run `meander doctor`, then fix, or `meander disable`.
 - Offscreen (`QT_QPA_PLATFORM=offscreen`) can't create layer-shell windows; test on Wayland.

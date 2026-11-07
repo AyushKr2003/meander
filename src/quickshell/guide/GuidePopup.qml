@@ -850,21 +850,37 @@ Item {
 
     Shortcut {
         sequences: [StandardKey.Find, "Ctrl+K"]
+        // Meander: Settings stays cached (hidden) in the popout window, so
+        // its shortcuts must sleep while it isn't shown, or they collide
+        // with the other popouts' keys (Ctrl+Tab, KeyNav).
+        enabled: root.visible
         onActivated: root.openSearch()
     }
 
     Shortcut {
         sequences: ["Ctrl+PgDown", "Ctrl+Tab"]
+        // Meander: Settings stays cached (hidden) in the popout window, so
+        // its shortcuts must sleep while it isn't shown, or they collide
+        // with the other popouts' keys (Ctrl+Tab, KeyNav).
+        enabled: root.visible
         onActivated: root.nextTab()
     }
 
     Shortcut {
         sequences: ["Ctrl+PgUp", "Ctrl+Shift+Tab"]
+        // Meander: Settings stays cached (hidden) in the popout window, so
+        // its shortcuts must sleep while it isn't shown, or they collide
+        // with the other popouts' keys (Ctrl+Tab, KeyNav).
+        enabled: root.visible
         onActivated: root.prevTab()
     }
 
     Shortcut {
         sequences: [StandardKey.Close, "Ctrl+Q"]
+        // Meander: Settings stays cached (hidden) in the popout window, so
+        // its shortcuts must sleep while it isn't shown, or they collide
+        // with the other popouts' keys (Ctrl+Tab, KeyNav).
+        enabled: root.visible
         onActivated: root.closePopup()
     }
 

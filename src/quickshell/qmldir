@@ -1,6 +1,8 @@
 Dock 1.0 dock/Dock.qml
 Dim 1.0 Dim.qml
 Main 1.0 Main.qml
+KeyNav 1.0 keynav/KeyNav.qml
+ThemePicker 1.0 themepicker/ThemePicker.qml
 
 Bar 1.0 bar/Bar.qml
 Floating 1.0 quickactions/Floating.qml
@@ -67,6 +69,7 @@ singleton Updater 1.0 singletons/system/Updater.qml
 singleton WindowTracker 1.0 singletons/system/WindowTracker.qml
 singleton ShellSurfaces 1.0 singletons/system/ShellSurfaces.qml
 singleton OmarchyHost 1.0 singletons/system/OmarchyHost.qml
+singleton KeyNavState 1.0 singletons/system/KeyNavState.qml
 OmarchyCompat 1.0 omarchy/OmarchyCompat.qml
 
 singleton SysData 1.0 singletons/info/SysData.qml

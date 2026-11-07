@@ -25,6 +25,14 @@ function getWidgetLauncherEntries(i18n) {
             icon: "preferences-desktop-wallpaper",
             fontIcon: "󰸉"
         },
+        // Meander: the Omarchy theme picker (themepicker/ThemePicker.qml).
+        {
+            id: "themes",
+            name: tr("widgets.themes.name", "Theme Picker"),
+            description: tr("widgets.themes.desc", "Browse and apply Omarchy themes"),
+            icon: "preferences-desktop-theme",
+            fontIcon: "󰏘"
+        },
         {
             id: "network",
             name: tr("widgets.network.name", "Network Settings"),
@@ -106,6 +114,16 @@ function getLayout(name, mx, my, mw, mh, userScale, barPosition) {
         },
         "wallpaper": { 
             w: "fill", h: 650, comp: "wallpaper/WallpaperPicker.qml", 
+            pos: { 
+                "top": { anchor: "center-left" }, 
+                "bottom": { anchor: "center-left" }, 
+                "left": { anchor: "center-left" }, 
+                "right": { anchor: "center-left" } 
+            } 
+        },
+        // Meander: laid out as the wallpaper picker is.
+        "themes": { 
+            w: "fill", h: 650, comp: "themepicker/ThemePicker.qml", 
             pos: { 
                 "top": { anchor: "center-left" }, 
                 "bottom": { anchor: "center-left" }, 

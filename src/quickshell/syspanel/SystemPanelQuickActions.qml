@@ -85,8 +85,9 @@ Item {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             acceptedButtons: Qt.LeftButton | Qt.RightButton
+            // Meander: keyboard clicks (KeyNav) come with no event; see KeyNavState.buttonOf.
             onClicked: (mouse) => {
-                if (mouse.button === Qt.RightButton) qaBtn.rightClicked();
+                if (KeyNavState.buttonOf(mouse) === Qt.RightButton) qaBtn.rightClicked();
                 else qaBtn.leftClicked();
             }
         }

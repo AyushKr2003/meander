@@ -53,7 +53,11 @@ Variants {
 
             // Its own namespace, so Hyprland rules (meander.lua) can reach it.
             WlrLayershell.namespace: "meander-bar"
-            WlrLayershell.keyboardFocus: (barWindowRoot.isNotifOpen || barWindowRoot.isSysOpen)
+            // Meander: bar focus (`meander keys bar`) holds the keyboard
+            // exclusively, so a workspace switch from the bar doesn't take it.
+            WlrLayershell.keyboardFocus: barWindowRoot.keyFocus
+                ? WlrKeyboardFocus.Exclusive
+                : (barWindowRoot.isNotifOpen || barWindowRoot.isSysOpen)
                 ? WlrKeyboardFocus.OnDemand
                 : WlrKeyboardFocus.None
 
@@ -145,6 +149,7 @@ Variants {
 
             property bool isRevealed: {
                 if (shouldHideForRedact) return false;
+                if (keyFocus) return true; // Meander: bar focus shows an autohidden bar
                 if (!autohide) return true;
                 if (barHover.hovered) return true;
                 if (hideTimer.running) return true;
@@ -402,6 +407,63 @@ Variants {
                     }
                 }
             }
+
+            // ---- Meander: bar focus (keynav/KeyNav.qml, `meander keys bar`)
+            // The bar takes the keyboard and a cursor walks its modules:
+            // arrows move, Enter clicks, Menu right-clicks, Ctrl+Tab goes to
+            // the dock, Escape gives the keyboard back. A module that opens a
+            // popout hands the keyboard to it (KeyNavState.pendingKeys).
+            readonly property bool keyFocus: KeyNavState.barScreen !== "" && !!modelData && KeyNavState.barScreen === modelData.name
+            onKeyFocusChanged: {
+                if (keyFocus) {
+                    barNav.reset(true);
+                    barKeys.forceActiveFocus();
+                    barKeysIdle.restart();
+                } else {
+                    barNav.reset(false);
+                    barKeysIdle.stop();
+                }
+            }
+            Item {
+                id: barKeys
+                anchors.fill: parent
+                Keys.onPressed: (event) => {
+                    if (event.key === Qt.Key_Escape) {
+                        KeyNavState.release();
+                        event.accepted = true;
+                        return;
+                    }
+                    barKeysIdle.restart();
+                    barNav.handle(event);
+                }
+            }
+            KeyNav {
+                id: barNav
+                anchors.fill: parent
+                scope: barWindowRoot.snapshotItem
+                focusHome: barKeys
+                active: barWindowRoot.keyFocus
+                onCycleRequested: KeyNavState.focusDock(barWindowRoot.modelData.name)
+                onActivated: {
+                    KeyNavState.pendingKeys = true;
+                    barPendingClear.restart();
+                }
+                // Reaching for the mouse ends bar focus.
+                onKeyModeChanged: if (!keyMode && barWindowRoot.keyFocus) KeyNavState.release()
+            }
+            // Ctrl+Tab to the dock: a Shortcut, since Qt's focus chain eats
+            // Ctrl+Tab before Keys handlers.
+            Shortcut {
+                sequences: ["Ctrl+Tab", "Ctrl+Shift+Tab", "Ctrl+Backtab"]
+                context: Qt.WindowShortcut
+                enabled: barWindowRoot.keyFocus
+                onActivated: KeyNavState.focusDock(barWindowRoot.modelData.name)
+            }
+            // A click that opened nothing (a workspace, play/pause) keeps the
+            // bar; drop the hand-over flag once no popout claimed it.
+            Timer { id: barPendingClear; interval: 1500; onTriggered: KeyNavState.pendingKeys = false }
+            // Never hold the keyboard forever: let go after 30 s untouched.
+            Timer { id: barKeysIdle; interval: 30000; onTriggered: KeyNavState.release() }
         }
     }
 }

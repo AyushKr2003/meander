@@ -279,12 +279,13 @@ Item {
                 }
             }
 
+            // Meander: keyboard clicks (KeyNav) come with no event; see KeyNavState.buttonOf.
             onClicked: function(mouse) {
-                if (mouse.button === Qt.MiddleButton) {
+                if (KeyNavState.buttonOf(mouse) === Qt.MiddleButton) {
                     dockWindow.launchApp(model.desktop_id);
                     return;
                 }
-                if (mouse.button === Qt.RightButton) {
+                if (KeyNavState.buttonOf(mouse) === Qt.RightButton) {
                     let pt = runningDockButton.mapToItem(null, 0, 0);
                     let globX = pt.x + (runningDockButton.width / 2);
                     let globY = pt.y + (runningDockButton.height / 2);
@@ -308,7 +309,7 @@ Item {
                     );
                     return;
                 }
-                if (mouse.button === Qt.LeftButton) {
+                if (KeyNavState.buttonOf(mouse) === Qt.LeftButton) {
                     if (typeof DockAppMenuController !== "undefined" && DockAppMenuController.isVisible && !DockAppMenuController.isSameApp(DockAppMenuController.desktopId, model.desktop_id)) {
                         let pt = runningDockButton.mapToItem(null, 0, 0);
                         let globX = pt.x + (runningDockButton.width / 2);

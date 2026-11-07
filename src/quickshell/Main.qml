@@ -28,6 +28,22 @@ PanelWindow {
         onActivated: switchWidget("hidden", "")
     }
 
+    // Meander: Ctrl+Tab / Ctrl+Shift+Tab walk the popouts (KeyNav). A
+    // Shortcut, because Qt's focus chain takes Ctrl+Tab before any Keys
+    // handler sees it. Settings keeps its own (its tabs).
+    Shortcut {
+        sequences: ["Ctrl+Tab"]
+        context: Qt.WindowShortcut
+        enabled: keyNav.active && !keyNav.followFocus
+        onActivated: masterWindow.cyclePanel(1)
+    }
+    Shortcut {
+        sequences: ["Ctrl+Shift+Tab", "Ctrl+Backtab"]
+        context: Qt.WindowShortcut
+        enabled: keyNav.active && !keyNav.followFocus
+        onActivated: masterWindow.cyclePanel(-1)
+    }
+
     function resolveTargetScreen() {
         try {
             if (typeof Hyprland !== "undefined" && Hyprland.focusedMonitor) {
@@ -403,6 +419,26 @@ PanelWindow {
 
     onCurrentActiveChanged: {
         reportWidgetState();
+        // Meander: a new popout starts without a keyboard cursor, unless the
+        // keyboard opened it (KeyNavState.pendingKeys).
+        keyNav.reset(currentActive !== "hidden" && KeyNavState.takePendingKeys());
+    }
+
+    // Meander: Ctrl+Tab / Ctrl+Shift+Tab walk the popouts (KeyNav), keeping
+    // the keyboard cursor on. Settings has its own Ctrl+Tab (its tabs).
+    readonly property var keyNavPanels: ["system", "notifications", "network", "volume", "music", "calendar", "wallpaper", "themes"]
+    // `meander keys open <panel>`: the popout opens with the cursor on.
+    function openWithKeys(panel, arg) {
+        if (activeWidget === panel) { keyNav.reset(true); return; }
+        KeyNavState.pendingKeys = true;
+        runCommand("open", panel, arg || "");
+    }
+    function cyclePanel(d) {
+        let i = keyNavPanels.indexOf(currentActive);
+        if (i < 0) i = d > 0 ? -1 : 0;
+        let next = keyNavPanels[(i + d + keyNavPanels.length) % keyNavPanels.length];
+        KeyNavState.pendingKeys = true;
+        switchWidget(next, "");
     }
 
     onScreenChanged: {
@@ -475,7 +511,7 @@ PanelWindow {
         if (!result) return null;
 
         let scale = masterWindow.globalUiScale || 1.0;
-        let isFixed = (name === "guide" || name === "wallpaper" || name === "notifications" || name === "system" || name === "hidden");
+        let isFixed = (name === "guide" || name === "wallpaper" || name === "themes" || name === "notifications" || name === "system" || name === "hidden");
 
         if (effHidden && !isFixed) {
             let offsetAdjustment = Math.round(46 * scale);
@@ -634,6 +670,10 @@ PanelWindow {
                 popEnter: null
                 popExit: null
 
+                // Meander: keys no popout control took drive the keyboard
+                // cursor (KeyNav).
+                Keys.onPressed: (event) => keyNav.handle(event)
+
                 Keys.onEscapePressed: (event) => {
                     switchWidget("hidden", "");
                     event.accepted = true;
@@ -642,6 +682,17 @@ PanelWindow {
                 onCurrentItemChanged: {
                     if (currentItem) currentItem.forceActiveFocus();
                 }
+            }
+
+            // Meander: full keyboard mode for every popout (keynav/KeyNav.qml).
+            // Settings moves its own focus; there the ring only follows it.
+            KeyNav {
+                id: keyNav
+                anchors.fill: parent
+                scope: widgetStack.currentItem
+                active: masterWindow.isVisible && !masterWindow.isClosing && masterWindow.currentActive !== "hidden"
+                followFocus: masterWindow.currentActive === "guide"
+                onCycleRequested: (d) => masterWindow.cyclePanel(d)
             }
         }
 

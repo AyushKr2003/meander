@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 import "widgets"
 
 // Meander -- entry point of the `meander.bar` Omarchy bar plugin.
@@ -24,7 +25,7 @@ Item {
     property var shell: null
     property var manifest: null
 
-    readonly property string version: manifest && manifest.version ? manifest.version : "2.4.2-1"
+    readonly property string version: manifest && manifest.version ? manifest.version : "2.4.2-2"
 
     // Created first thing, so the notification server (when Meander owns it,
     // see OmarchyHost.fileOwns) is on the bus before the rest of the bar has
@@ -151,6 +152,30 @@ Item {
     IpcHandler {
         target: "omarchy.bar"
         function syncHidden(): void { barHiddenProbe.running = true; }
+    }
+
+    // Full keyboard mode (keynav/KeyNav.qml, `meander keys ...`): the bar or
+    // dock of the focused monitor takes the keyboard, or a popout opens with
+    // the cursor on. bar/dock toggle; Escape (or `off`) gives the keyboard
+    // back.
+    IpcHandler {
+        target: "meander.keys"
+        function bar(): void { root.keysFocus("bar"); }
+        function dock(): void { root.keysFocus("dock"); }
+        function off(): void { KeyNavState.release(); }
+        function open(panel: string, arg: string): void {
+            KeyNavState.release();
+            mainWindow.openWithKeys(panel, arg);
+        }
+    }
+    function keysFocus(kind) {
+        const mon = Hyprland.focusedMonitor ? Hyprland.focusedMonitor.name : "";
+        const cur = kind === "bar" ? KeyNavState.barScreen : KeyNavState.dockScreen;
+        if (cur !== "" && cur === mon) { KeyNavState.release(); return; }
+        if (kind === "dock" && !KeyNavState.docks[mon]) return;
+        mainWindow.runCommand("close", "", "");
+        if (kind === "bar") KeyNavState.focusBar(mon);
+        else if (!KeyNavState.focusDock(mon)) console.log("meander: no dock on " + mon + " (Settings > Dock)");
     }
 
     // ------------------------------------------------- background helpers

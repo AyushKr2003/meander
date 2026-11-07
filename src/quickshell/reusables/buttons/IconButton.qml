@@ -115,9 +115,10 @@ Item {
             acceptedButtons: root.acceptedButtons
             cursorShape: root.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
 
+            // Meander: keyboard clicks (KeyNav) come with no event; see KeyNavState.buttonOf.
             onClicked: (mouse) => {
                 if (!root.enabled) return;
-                if (mouse.button === Qt.RightButton) {
+                if (KeyNavState.buttonOf(mouse) === Qt.RightButton) {
                     root.rightClicked();
                     return;
                 }

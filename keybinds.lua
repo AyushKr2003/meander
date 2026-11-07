@@ -26,10 +26,18 @@ o.bind("SUPER + ALT + N", "Meander network", "meander msg toggle network wifi")
 o.bind("SUPER + ALT + U", "Meander volume", "meander msg toggle volume")
 o.bind("SUPER + ALT + C", "Meander calendar", "meander msg toggle calendar")
 o.bind("SUPER + ALT + W", "Meander wallpapers", "meander msg toggle wallpaper")
+o.bind("SUPER + ALT + P", "Meander theme picker", "meander msg toggle themes")
 o.bind("SUPER + ALT + H", "Meander settings", "meander settings toggle")
 o.bind("SUPER + ALT + Z", "Meander bar autohide", "meander msg bar autohide")
 o.bind("SUPER + ALT + X", "Meander screenshot", "meander screenshot")
 o.bind("SUPER + ALT + T", "Meander desktop widgets", "meander redactor")
+
+-- ── Keyboard navigation ─────────────────────────────────────────────────────
+-- The bar takes the keyboard (arrows move, Enter clicks, Ctrl+Tab goes to the
+-- dock, Escape gives it back). SUPER + CTRL + 0 is Omacale's bar-focus key too.
+
+o.bind("SUPER + CTRL + 0", "Meander bar focus", "meander keys bar")
+-- o.bind("SUPER + CTRL + ALT + 0", "Meander dock focus", "meander keys dock")
 
 -- ── Optional: give Omarchy's main keys to Meander ───────────────────────────
 -- Remove the "--" to use them. They replace Omarchy's launcher, clipboard,
@@ -38,6 +46,8 @@ o.bind("SUPER + ALT + T", "Meander desktop widgets", "meander redactor")
 -- o.rebind("SUPER + SPACE", "Meander launcher", "meander msg toggle launcher")
 -- o.rebind("SUPER + CTRL + V", "Meander clipboard", "meander msg toggle clipboard")
 -- o.rebind("SUPER + CTRL + SPACE", "Meander wallpapers", "meander msg toggle wallpaper")
+-- o.rebind("SUPER + CTRL + T", "Meander theme picker", "meander msg toggle themes")
+-- o.rebind("SUPER + SHIFT + CTRL + SPACE", "Meander theme picker", "meander msg toggle themes")
 -- o.rebind("PRINT", "Meander screenshot", "meander screenshot")
 -- o.rebind("SHIFT + PRINT", "Meander screenshot and edit", "meander screenshot --edit")
 -- o.rebind("SUPER + ESCAPE", "Meander power menu", "meander msg toggle system")

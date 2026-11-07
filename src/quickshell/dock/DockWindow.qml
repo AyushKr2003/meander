@@ -13,8 +13,11 @@ DockWindowApps {
     property alias dockTransform: dockContainerItem.dockTransform
 
     WlrLayershell.namespace: "qs-dock"
-    WlrLayershell.layer: (dockWindowRoot.dockOnTop || dockWindowRoot.editMode) ? WlrLayer.Top : WlrLayer.Bottom
-    focusable: dockWindowRoot.editMode
+    // Meander: dock focus (`meander keys dock`) raises the dock and holds
+    // the keyboard; edit mode is upstream's (focusable = OnDemand).
+    WlrLayershell.layer: (dockWindowRoot.dockOnTop || dockWindowRoot.editMode || dockWindowRoot.keyFocus) ? WlrLayer.Top : WlrLayer.Bottom
+    WlrLayershell.keyboardFocus: dockWindowRoot.keyFocus ? WlrKeyboardFocus.Exclusive
+        : dockWindowRoot.editMode ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
 
@@ -139,6 +142,7 @@ DockWindowApps {
     property bool isRevealed: {
         if (isFullscreenActive) return false;
         if (editMode) return true;
+        if (keyFocus) return true; // Meander: dock focus shows an autohidden dock
         if (!effectiveAutohide) return true;
         if (typeof DockAppMenuController !== "undefined" && DockAppMenuController.isVisible && (!DockAppMenuController.screen || !dockWindowRoot.screen || DockAppMenuController.screen.name === dockWindowRoot.screen.name)) return true;
         if (dockHover.hovered) return true;
@@ -241,6 +245,7 @@ DockWindowApps {
     }
 
     Component.onCompleted: {
+        KeyNavState.setDock(dockWindowRoot.myOutput, visible); // Meander: dock focus
         if (Compositor.name === "niri") {
             NiriState.subscribe();
         }
@@ -261,6 +266,7 @@ DockWindowApps {
     }
 
     Component.onDestruction: {
+        KeyNavState.setDock(dockWindowRoot.myOutput, false); // Meander: dock focus
         ShellSurfaces.unregister("docks", modelData.name, dockWindowRoot);
         if (Compositor.name === "niri") {
             NiriState.unsubscribe();
@@ -392,4 +398,54 @@ DockWindowApps {
         dockWindow: dockWindowRoot
         dockContainer: dockContainerItem
     }
+
+    // ---- Meander: dock focus (keynav/KeyNav.qml, `meander keys dock`)
+    // A cursor over the dock's apps: arrows move, Enter opens or focuses the
+    // app (and gives the keyboard back to it), Menu opens the app menu,
+    // Ctrl+Tab goes to the bar, Escape lets go.
+    readonly property bool keyFocus: KeyNavState.dockScreen !== "" && KeyNavState.dockScreen === dockWindowRoot.myOutput
+    onVisibleChanged: KeyNavState.setDock(dockWindowRoot.myOutput, visible)
+    onMyOutputChanged: KeyNavState.setDock(dockWindowRoot.myOutput, visible)
+    onKeyFocusChanged: {
+        if (keyFocus) {
+            dockNav.reset(true);
+            dockKeys.forceActiveFocus();
+            dockKeysIdle.restart();
+        } else {
+            dockNav.reset(false);
+            dockKeysIdle.stop();
+        }
+    }
+    Item {
+        id: dockKeys
+        anchors.fill: parent
+        Keys.onPressed: (event) => {
+            if (event.key === Qt.Key_Escape) {
+                KeyNavState.release();
+                event.accepted = true;
+                return;
+            }
+            dockKeysIdle.restart();
+            dockNav.handle(event);
+        }
+    }
+    KeyNav {
+        id: dockNav
+        anchors.fill: parent
+        scope: dockContainerItem
+        focusHome: dockKeys
+        active: dockWindowRoot.keyFocus && !dockWindowRoot.editMode
+        onCycleRequested: KeyNavState.focusBar(dockWindowRoot.myOutput)
+        // The app (or its menu) takes over from here.
+        onActivated: dockRelease.restart()
+        onKeyModeChanged: if (!keyMode && dockWindowRoot.keyFocus) KeyNavState.release()
+    }
+    Shortcut {
+        sequences: ["Ctrl+Tab", "Ctrl+Shift+Tab", "Ctrl+Backtab"]
+        context: Qt.WindowShortcut
+        enabled: dockWindowRoot.keyFocus
+        onActivated: KeyNavState.focusBar(dockWindowRoot.myOutput)
+    }
+    Timer { id: dockRelease; interval: 60; onTriggered: KeyNavState.release() }
+    Timer { id: dockKeysIdle; interval: 30000; onTriggered: KeyNavState.release() }
 }
