@@ -220,6 +220,8 @@ Item {
                         anchors.fill: parent
                         source: artImg
                         maskEnabled: true
+                        maskThresholdMin: 0.5 // meander: antialiased mask edge (the default 0 makes it a hard step)
+                        maskSpreadAtMin: 1.0
                         maskSource: maskRect
                         opacity: (root.isMediaActive && artImg.status === Image.Ready && MprisController.artUrl !== "") ? 1.0 : 0.0
 

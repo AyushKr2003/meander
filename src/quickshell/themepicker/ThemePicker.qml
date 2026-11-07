@@ -221,6 +221,14 @@ Item {
         Behavior on anchors.margins { NumberAnimation { duration: 650; easing.type: Easing.OutQuint } }
 
         spacing: 0; orientation: ListView.Horizontal; clip: false
+        // meander: the cards are sheared with a Matrix4x4 and clipped by a
+        // MultiEffect mask; the effect's quad gets no edge antialiasing under
+        // the shear, so the slanted sides came out stair-stepped. Rendering
+        // the carousel into one multisampled layer antialiases those edges
+        // (one fixed-size texture, so scrolling doesn't reallocate it).
+        layer.enabled: true
+        layer.samples: 4
+        layer.smooth: true
         cacheBuffer: window.itemWidth * 3
         keyNavigationEnabled: false
         highlightRangeMode: ListView.StrictlyEnforceRange
@@ -299,7 +307,7 @@ Item {
                     Item {
                         anchors.fill: parent
                         layer.enabled: true
-                        layer.effect: MultiEffect { maskEnabled: true; maskSource: mask }
+                        layer.effect: MultiEffect { maskEnabled: true; maskThresholdMin: 0.5; maskSpreadAtMin: 1.0; maskSource: mask }
 
                         Image {
                             anchors.centerIn: parent

@@ -62,6 +62,13 @@ Meander 2.4.2-2 against Serpantinum 2.4.2 (+10 commits, `246061b`), module by mo
   object arrives as null, so the handler threw and Enter did nothing.
 - Settings' shortcuts (Ctrl+Tab, Ctrl+K, Ctrl+Q) stayed live while it was hidden in
   the popout cache, colliding with other popouts' keys.
+- Rounded image masks (`MultiEffect` with `maskEnabled`) used the default
+  `maskThresholdMin: 0`, a hard step that made every masked corner jagged; each
+  rounded mask now sets `maskThresholdMin: 0.5` + `maskSpreadAtMin: 1.0` (the
+  transition-shader masks in `WallpaperEngine`/`TransitionTile` keep theirs).
+- The wallpaper picker's skewed cards had stair-stepped slanted edges (the mask
+  effect's quad gets no antialiasing under the shear); the carousel `ListView`
+  (and the theme picker's) renders into a 4x multisampled layer.
 
 - Wallpaper thumbnailing converted `.webp` sources to `.jpg` and deleted the
   originals in the wallpaper folder (it would have deleted Omarchy theme files).

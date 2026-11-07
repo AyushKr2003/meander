@@ -185,6 +185,8 @@ Item {
                                         layer.enabled: true
                                         layer.effect: MultiEffect {
                                             maskEnabled: true
+                                            maskThresholdMin: 0.5 // meander: antialiased mask edge (the default 0 makes it a hard step)
+                                            maskSpreadAtMin: 1.0
                                             maskSource: eqFillMask
                                         }
 

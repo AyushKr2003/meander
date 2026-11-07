@@ -233,6 +233,8 @@ Item {
                                     anchors.fill: mediaArtImg
                                     source: mediaArtImg
                                     maskEnabled: true
+                                    maskThresholdMin: 0.5 // meander: antialiased mask edge (the default 0 makes it a hard step)
+                                    maskSpreadAtMin: 1.0
                                     maskSource: mediaArtMask
                                     visible: root.hasArt && mediaArtImg.status === Image.Ready
                                 }
@@ -417,6 +419,8 @@ Item {
                         anchors.fill: sideArtImg
                         source: sideArtImg
                         maskEnabled: true
+                        maskThresholdMin: 0.5 // meander: antialiased mask edge (the default 0 makes it a hard step)
+                        maskSpreadAtMin: 1.0
                         maskSource: sideArtMask
                         visible: isMediaActive && root.activeArtUrl !== "" && sideArtImg.status === Image.Ready
                     }
