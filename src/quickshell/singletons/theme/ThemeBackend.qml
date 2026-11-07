@@ -19,21 +19,25 @@ Item {
         );
     }
 
-    // Hyprland's window corners follow this radius (meander.lua): the value
-    // goes to $XDG_STATE_HOME/meander/hypr.lua, which meander.lua reads on
-    // every load, and to meander_apply() at once through `hyprctl eval`
-    // (a no-op unless meander.lua is loaded).
+    // Hyprland's window corners follow this radius, and the focused window's
+    // border this accent (the keyboard ring's colour, keynav/KeyNav.qml), in
+    // meander.lua: the values go to $XDG_STATE_HOME/meander/hypr.lua, which
+    // meander.lua reads on every load, and to meander_apply() at once through
+    // `hyprctl eval` (a no-op unless meander.lua is loaded).
     onBorderRadiusChanged: hyprRadiusSync.restart()
+    onPrimaryChanged: hyprRadiusSync.restart()
     Timer {
         id: hyprRadiusSync
         interval: 400
         onTriggered: {
             let r = Math.max(0, Math.round(root.borderRadius));
+            let hex = String(root.primary).replace("#", "");
+            let accent = /^[0-9a-fA-F]{6,8}$/.test(hex) ? hex.slice(-6).toLowerCase() : "";
             let dir = (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/meander";
             Quickshell.execDetached(["bash", "-c",
-                "mkdir -p \"$1\" && printf 'return { radius = %s }\\n' \"$2\" > \"$1/hypr.lua\" && " +
-                "hyprctl eval \"if meander_apply then meander_apply({ radius = $2 }) end\" >/dev/null 2>&1",
-                "meander-hypr", dir, String(r)]);
+                "mkdir -p \"$1\" && printf 'return { radius = %s, accent = \"%s\" }\\n' \"$2\" \"$3\" > \"$1/hypr.lua\" && " +
+                "hyprctl eval \"if meander_apply then meander_apply({ radius = $2, accent = '$3' }) end\" >/dev/null 2>&1",
+                "meander-hypr", dir, String(r), accent]);
         }
     }
 

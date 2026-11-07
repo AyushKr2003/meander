@@ -70,8 +70,8 @@ SUPER + CTRL + T (theme menu), PRINT and SUPER + ESCAPE to Meander too.
 
 The theme picker (`meander msg toggle themes`) shows Omarchy's themes the way
 the wallpaper picker shows wallpapers: ← → (or h l, the wheel) to browse,
-Enter or a click to apply (`omarchy-theme-set`), `/` to search. It stays open,
-so you can try the next one.
+Enter to apply (`omarchy-theme-set`) and close, Space or a click to apply and
+stay open to try the next one, `/` to search.
 
 ### Keyboard navigation
 
@@ -101,11 +101,15 @@ as the popouts reaches every control there, sliders and switches included,
 and `Escape` steps back out to the tabs (a second `Escape` closes Settings).
 
 The wallpaper and theme pickers drive their carousel themselves: `←` `→`
-move, `Enter` applies, `Tab` changes the filter or searches.
+move, `Enter` applies and closes the picker, `Tab` changes the filter or
+searches. A click (or `Space` in the theme picker) applies and keeps it open
+to try the next one.
 
-`meander.lua` is Serpantinum's Hyprland look (borderless windows, 4/6px gaps,
-light blur, no shadow, its pop-in animations), with window corners that follow
-Meander's corner radius live. Load it from `~/.config/hypr/looknfeel.lua`
+`meander.lua` is Serpantinum's Hyprland look (4/6px gaps, light blur, no
+shadow, its pop-in animations), with window corners that follow Meander's
+corner radius live and a thin 1px accent border on the focused window, in the
+colour of the ring the keyboard cursor draws in the shell (unfocused windows stay
+borderless). Load it from `~/.config/hypr/looknfeel.lua`
 (also optional):
 
 ```lua

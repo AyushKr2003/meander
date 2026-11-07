@@ -4,6 +4,16 @@ What changed in each version of Meander, newest first. Versions are the ones in 
 
 Meander's version is the Serpantinum release it is built on plus a port revision: `2.4.2-1` is the first Meander release on Serpantinum 2.4.2, `2.4.2-2` a Meander-only change on the same base, and `2.4.3-1` the first release after merging Serpantinum 2.4.3. `upstream.json` holds the exact upstream commit; `meander upstream` shows how far behind Serpantinum's latest release and master it is.
 
+## 2.4.2-5 - 2026-11-08
+
+Upstream base: unchanged (Serpantinum v2.4.2 +10 commits, `246061b`).
+
+### Added
+- **hyprland**: `meander.lua` draws a thin 1px border on the focused window in the shell's accent (the keyboard ring's colour), following theme changes live; unfocused windows stay borderless
+
+### Changed
+- **wallpapers, themes**: Enter applies and closes the picker (an online wallpaper closes once downloaded and applied); a click, or Space in the theme picker, still applies and keeps it open
+
 ## 2.4.2-4 - 2026-11-07
 
 Upstream base: unchanged (Serpantinum v2.4.2 +10 commits, `246061b`).

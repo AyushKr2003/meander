@@ -63,7 +63,7 @@ Order of preference: an Omarchy command or IPC (`omarchy-*`, `omarchy-shell <tar
 | Night light / gamma | `hyprsunset` via `meander-gamma`, `omarchy-shell nightlight refresh` |
 | Power | `omarchy-system logout/reboot/shutdown`, `omarchy-toggle-enabled suspend-off`, `omarchy-sleep-disabled`, `omarchy-hibernation-available` |
 | Terminal / defaults | `xdg-terminal-exec`, `omarchy-default-terminal`, `omarchy-default-browser` |
-| Window corners | `ThemeBackend.borderRadius` -> `$XDG_STATE_HOME/meander/hypr.lua` (`return { radius = N }`) + `hyprctl eval "meander_apply({radius=N})"`; `meander.lua` reads the file on load (rounding = clamped radius + 2) |
+| Window corners, focus border | `ThemeBackend.borderRadius` + `primary` -> `$XDG_STATE_HOME/meander/hypr.lua` (`return { radius = N, accent = "rrggbb" }`) + `hyprctl eval "meander_apply({...})"`; `meander.lua` reads the file on load (rounding = clamped radius + 2; 1px border, accent on the focused window, transparent otherwise) |
 | Early notifications | `manifest.json` also declares kind `service` (`MeanderService.qml`): created synchronously after the plugin scan, seconds before the async bar, and shares the `NotificationManager` singleton with it (one engine, same file URL). Ownership before the bar gets the registry comes from `shell.json` (`OmarchyHost.fileOwns`) |
 | Bar hide | `~/.local/state/omarchy/toggles/bar-off` + `omarchy.bar syncHidden` |
 | Panel hotkeys | host contract `summonBarWidget/hideBarWidget/isBarWidgetOpen` mapped in `MeanderBar.widgetTargets` |

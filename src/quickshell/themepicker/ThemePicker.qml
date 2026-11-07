@@ -14,11 +14,12 @@ import "../reusables"
 //
 // Data: `meander-core themes` (Omarchy's own picker rows + each theme's
 // palette). Apply: `omarchy-theme-set <id>`; Meander follows the switch
-// through Omarchy's `background themeTransition` IPC like any theme change,
-// and the picker stays open so you can try the next one.
+// through Omarchy's `background themeTransition` IPC like any theme change.
+// Enter applies and closes the picker; Space or a click applies and keeps it
+// open so you can try the next one.
 //
-// Keys: ← → / h l move, Enter or Space applies, Home / End, / or Tab to
-// search (Enter or ↓ back to the cards), Escape closes (Main.qml).
+// Keys: ← → / h l move, Enter applies and closes, Space applies, Home / End,
+// / or Tab to search (Enter or ↓ back to the cards), Escape closes (Main.qml).
 Item {
     id: window
     visible: false
@@ -173,6 +174,11 @@ Item {
     }
     Timer { id: applyTimeout; interval: 15000; onTriggered: window.applyingId = "" }
 
+    function closeHost() {
+        if (typeof masterWindow !== "undefined" && masterWindow.switchWidget) masterWindow.switchWidget("hidden", "");
+        else Quickshell.execDetached(["bash", Caching.meanderDir + "/scripts/qs_manager.sh", "close"]);
+    }
+
     function themeName(id) {
         for (let i = 0; i < window.allThemes.length; i++) if (window.allThemes[i].id === id) return window.allThemes[i].name;
         return id;
@@ -203,7 +209,8 @@ Item {
         else if (k === Qt.Key_Right || (plain && t === "l")) window.step(1);
         else if (k === Qt.Key_Home) window.step(-shown.count);
         else if (k === Qt.Key_End) window.step(shown.count);
-        else if (k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_Space) window.apply(view.currentIndex);
+        else if (k === Qt.Key_Return || k === Qt.Key_Enter) { if (shown.count) { window.apply(view.currentIndex); window.closeHost(); } }
+        else if (k === Qt.Key_Space) window.apply(view.currentIndex);
         else if (k === Qt.Key_Slash || k === Qt.Key_Tab || k === Qt.Key_Up) window.openSearch("");
         else if (k === Qt.Key_Down || (plain && (t === "j" || t === "k"))) {}
         else return;

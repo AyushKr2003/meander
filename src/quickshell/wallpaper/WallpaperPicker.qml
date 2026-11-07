@@ -286,6 +286,10 @@ Item {
                 if (typeof Matugen !== "undefined" && typeof Matugen.generate === "function") {
                     Matugen.generate(targetDestFile);
                 }
+                // Meander: applied with Enter (see the Return Shortcut).
+                if (window.closeAfterDownload) window.closeHost();
+            } else {
+                window.closeAfterDownload = false;
             }
         }
     }
@@ -706,6 +710,7 @@ Item {
     }
 
     onVisibleChanged: {
+        if (!visible) window.closeAfterDownload = false; // Meander: see closeHost()
         if (!visible) {
             window._refreshedForDisplay = false;
             window.isExiting = false;
@@ -1544,14 +1549,28 @@ Item {
     Shortcut { sequence: "Left"; enabled: window.visible && !searchInput.hasFocus && !window.isScrollingBlocked && !window.isApplying; onActivated: window.stepToNextValidIndex(-1) }
     Shortcut { sequence: "Right"; enabled: window.visible && !searchInput.hasFocus && !window.isScrollingBlocked && !window.isApplying; onActivated: window.stepToNextValidIndex(1) }
     Shortcut {
-        sequence: "Return"
+        // Meander: keypad Enter too.
+        sequences: ["Return", "Enter"]
         enabled: window.visible && !searchInput.hasFocus && !window.isScrollingBlocked && !window.isApplying
         onActivated: {
             if (view.currentIndex >= 0 && view.currentIndex < displayModel.count) {
                 let item = displayModel.get(view.currentIndex);
-                if (item && item.fileName) window.applyWallpaper(String(item.fileName), !!item.isVideo);
+                if (item && item.fileName) {
+                    window.applyWallpaper(String(item.fileName), !!item.isVideo);
+                    // Meander: Enter applies and closes the picker (a click
+                    // still keeps it open to try the next one). An online
+                    // result closes once it has downloaded and applied.
+                    if (window.isDownloadingWallpaper) window.closeAfterDownload = true;
+                    else if (window.isApplying) window.closeHost();
+                }
             }
         }
+    }
+    property bool closeAfterDownload: false
+    function closeHost() {
+        closeAfterDownload = false;
+        if (typeof masterWindow !== "undefined" && masterWindow.switchWidget) masterWindow.switchWidget("hidden", "");
+        else Quickshell.execDetached(["bash", Caching.meanderDir + "/scripts/qs_manager.sh", "close"]);
     }
     Shortcut {
         sequence: "F"

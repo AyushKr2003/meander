@@ -13,14 +13,19 @@
 -- Ported from Serpantinum's own Hyprland config (compositors/hyprland/config/
 -- settings.lua), which its author ships to match the shell: borderless
 -- windows, small gaps, rounded corners, light blur, no shadow, and one springy
--- curve for windows and layers. Border colours (when you turn borders back
--- on) stay the Omarchy theme's, from its hyprland.lua.
+-- curve for windows and layers. Meander adds one thing: a thin 1px accent
+-- border on the focused window, in the colour of the ring its keyboard cursor
+-- draws in the shell (keynav/KeyNav.qml).
 
 -- ── Values ──────────────────────────────────────────────────────────────────
 
 local vars = {
-  -- Serpantinum draws its panels without outlines and its windows the same.
-  borderSize = 0,
+  -- Serpantinum draws its windows without outlines; Meander gives the
+  -- focused one a hairline of the shell's accent (its keyboard ring's
+  -- colour). Unfocused windows keep a transparent border, so they stay
+  -- outline-free.
+  borderSize = 1,
+  inactiveBorder = "rgba(00000000)",
 
   -- 4px between windows, 6px to the screen edge: the same distance Meander's
   -- popouts keep from the screen edge and the bar (WindowRegistry.js, 4-6px).
@@ -42,12 +47,13 @@ local vars = {
   shadow = false,
 }
 
--- ── Meander's corner radius ─────────────────────────────────────────────────
--- The shell (ThemeBackend) writes its radius to
--- $XDG_STATE_HOME/meander/hypr.lua, read here on every load, and calls
--- meander_apply() with the same table through `hyprctl eval` when it
--- changes, so a new radius lands at once and survives `hyprctl reload`.
--- Without the file (no Meander shell yet) the default radius applies.
+-- ── Meander's corner radius and accent ──────────────────────────────────────
+-- The shell (ThemeBackend) writes its radius and accent (its primary colour,
+-- the keyboard ring's) to $XDG_STATE_HOME/meander/hypr.lua, read here on
+-- every load, and calls meander_apply() with the same table through
+-- `hyprctl eval` when either changes, so a new value lands at once and
+-- survives `hyprctl reload`. Without the file (no Meander shell yet) the
+-- default radius and the Omarchy theme's border colour apply.
 
 -- Meander clamps large radii the same way for its panels
 -- (ThemeBackend.clampedBorderRadius).
@@ -64,13 +70,35 @@ local function meander_rounding(s)
   return clamped(r) + vars.roundingOffset
 end
 
+-- "rrggbb" from the shell, as a Hyprland colour; nil keeps the theme's.
+local function meander_accent(s)
+  local a = type(s) == "table" and s.accent or nil
+  if type(a) ~= "string" or not a:match("^%x%x%x%x%x%x$") then return nil end
+  return "rgb(" .. a .. ")"
+end
+
+local function meander_borders(s)
+  local active = meander_accent(s)
+  local cfg = {
+    general = { col = { inactive_border = vars.inactiveBorder } },
+    group = { col = { border_inactive = vars.inactiveBorder } },
+  }
+  if active then
+    cfg.general.col.active_border = active
+    cfg.group.col.border_active = active
+  end
+  return cfg
+end
+
 local state_dir = (os.getenv("XDG_STATE_HOME") or (os.getenv("HOME") .. "/.local/state")) .. "/meander"
 local state_ok, state = pcall(dofile, state_dir .. "/hypr.lua")
-local rounding = meander_rounding(state_ok and state or nil)
+state = state_ok and state or nil
+local rounding = meander_rounding(state)
 
 -- Global, so the shell can reach it through `hyprctl eval`.
 function meander_apply(s)
   hl.config({ decoration = { rounding = meander_rounding(s) } })
+  hl.config(meander_borders(s))
 end
 
 -- ── General / decoration (upstream settings.lua) ────────────────────────────
@@ -82,7 +110,7 @@ hl.config({
     gaps_out = vars.gapsOut,
     float_gaps = vars.floatGaps,
     resize_on_border = true,
-    -- With no border to grab, give resizing a wider invisible edge.
+    -- The border is thin; give resizing a wider invisible edge.
     extend_border_grab_area = 30,
   },
 
@@ -99,6 +127,9 @@ hl.config({
     },
   },
 })
+
+-- The focused window's ring (see vars.borderSize).
+hl.config(meander_borders(state))
 
 -- ── Animations (upstream settings.lua) ──────────────────────────────────────
 -- One overshooting curve for everything: windows pop in from 80%, layers fade,
