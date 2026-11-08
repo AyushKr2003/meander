@@ -24,7 +24,7 @@ local vars = {
   -- focused one a hairline of the shell's accent (its keyboard ring's
   -- colour). Unfocused windows keep a transparent border, so they stay
   -- outline-free.
-  borderSize = 1,
+  borderSize = 0,
   inactiveBorder = "rgba(00000000)",
 
   -- 4px between windows, 6px to the screen edge: the same distance Meander's

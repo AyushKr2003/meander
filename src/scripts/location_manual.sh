@@ -17,6 +17,15 @@ country="$(echo "$bdc" | jq -r '.countryName // "Unknown"')"
 code="$(echo "$bdc" | jq -r '.countryCode // "Unknown" | ascii_upcase')"
 region="$(echo "$bdc" | jq -r '.principalSubdivision // "Unknown"')"
 
+# Meander: the location is Omarchy's (see location.sh). Store the place in
+# Omarchy's weather.json, so Omarchy's weather panel follows it too, then let
+# location.sh rebuild general.location from there.
+if command -v omarchy-weather-location >/dev/null 2>&1; then
+    [[ "$city" == "Unknown" ]] && city="${lat},${lon}"
+    omarchy-weather-location --set "$city" "${lat},${lon}" || exit 1
+    exec "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/location.sh" --refresh >/dev/null
+fi
+
 tz_req="$(curl -s --max-time 10 "https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&timezone=auto")"
 tz="$(echo "$tz_req" | jq -r '.timezone // "UTC"')"
 

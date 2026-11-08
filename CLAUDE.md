@@ -58,6 +58,7 @@ Order of preference: an Omarchy command or IPC (`omarchy-*`, `omarchy-shell <tar
 | Idle | Omarchy's idle service; Meander's `idle.enabled` stays false by default |
 | Notifications | Meander's NotificationServer once `omarchy.notifications` is off; Omarchy's `notifications` IPC (DND, dismissAll, act, ...) answered by `OmarchyCompat` |
 | OSD | `osd show` IPC from `omarchy-osd` -> `OsdController.show` |
+| Location (weather, sun times, night light) | `omarchy-weather-location` state `~/.local/state/omarchy/settings/weather.json` (name-only entries geocoded via Open-Meteo), else `geo.omarchy.org`; `scripts/location.sh` caches it in `general.location` keyed by `omarchy_key`, `Location.qml` watches the file; Settings writes back with `omarchy-weather-location --set/--clear` |
 | Clipboard | `~/.local/state/omarchy/clipboard-history.json` (Omarchy records it); pins in `~/.cache/meander/clipboard/pins.json` |
 | Brightness | `omarchy-brightness-display --no-osd N%` |
 | Night light / gamma | `hyprsunset` via `meander-gamma`, `omarchy-shell nightlight refresh` |

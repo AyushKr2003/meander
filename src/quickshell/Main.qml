@@ -684,9 +684,9 @@ PanelWindow {
                 // Meander: keys no popout control took drive the keyboard
                 // cursor (KeyNav).
                 Keys.onPressed: (event) => keyNav.handle(event)
-                // A popout's own Shortcuts (the calendar's Left/Right) beat
-                // any Keys handler: while the cursor is shown, its keys are
-                // claimed so they reach it.
+                // A popout's own Shortcuts beat any Keys handler: while the
+                // cursor is shown, its keys are claimed so they reach it
+                // (not the calendar's arrows: vimKeysOnly).
                 Keys.onShortcutOverride: (event) => {
                     if (keyNav.claims(event)) event.accepted = true;
                 }
@@ -711,6 +711,9 @@ PanelWindow {
                 readonly property bool settings: masterWindow.currentActive === "guide"
                 scope: !settings ? page : (page && page.keyNavContent ? page.keyNavScope : null)
                 active: masterWindow.isVisible && !masterWindow.isClosing && masterWindow.currentActive !== "hidden" && scope !== null
+                // The calendar's arrows flip the month / weather day as
+                // upstream; its cursor moves with h j k l.
+                vimKeysOnly: masterWindow.currentActive === "calendar"
                 onCycleRequested: (d) => masterWindow.cyclePanel(d)
             }
             Connections {

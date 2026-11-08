@@ -19,6 +19,8 @@ import "KeyNavLogic.js" as Logic
 // A popout's own Shortcuts win over Keys handlers: the owner claims the
 // cursor's keys with claims() from Keys.onShortcutOverride (the calendar's
 // Left/Right), while upstream's Tab (music, volume, network: sections) stays.
+// With `vimKeysOnly` (the calendar) the arrows are never taken: h j k l move
+// the cursor and the arrows keep doing what upstream made them do.
 //
 // It works on upstream's code as it is, so upstream merges stay clean: the
 // controls are found by walking `scope` on every key, not declared. A stop
@@ -48,6 +50,9 @@ Item {
     property Item focusHome: scope
     // Off: every key passes through and nothing is drawn.
     property bool active: true
+    // Only h j k l move the cursor; the arrow keys stay the surface's own
+    // (the calendar: Left/Right flip the month or the weather day, upstream).
+    property bool vimKeysOnly: false
 
     // The ring shows only while the keyboard is in use; moving the pointer
     // hides it (the cursor is kept for the next key).
@@ -90,9 +95,12 @@ Item {
         return ""
     }
 
+    // The item's box as drawn: mapped through its own and its ancestors'
+    // transforms (scale, rotation, Translate), so a scaled control (the
+    // calendar's hour cards shrink with depth) gets a ring its own size.
     function rectOf(it) {
-        const p = it.mapToItem(root, 0, 0)
-        return { x: p.x, y: p.y, w: it.width, h: it.height }
+        const m = it.mapToItem(root, Qt.rect(0, 0, it.width, it.height))
+        return { x: m.x, y: m.y, w: m.width, h: m.height }
     }
 
     // Every stop, as { t, kind, r, flick, clip, block, sub }. `clip` is the
@@ -342,10 +350,11 @@ Item {
 
         let dx = 0, dy = 0
         if (plain) {
-            if (k === Qt.Key_Left || t === "h") dx = -1
-            else if (k === Qt.Key_Right || t === "l") dx = 1
-            else if (k === Qt.Key_Up || t === "k") dy = -1
-            else if (k === Qt.Key_Down || t === "j") dy = 1
+            const arrows = !vimKeysOnly
+            if ((arrows && k === Qt.Key_Left) || t === "h") dx = -1
+            else if ((arrows && k === Qt.Key_Right) || t === "l") dx = 1
+            else if ((arrows && k === Qt.Key_Up) || t === "k") dy = -1
+            else if ((arrows && k === Qt.Key_Down) || t === "j") dy = 1
         }
         const nav = dx !== 0 || dy !== 0 || (isTab && !ctrl) || k === Qt.Key_Home || k === Qt.Key_End
 
@@ -383,7 +392,8 @@ Item {
         if (!active || !scope || !keyMode || !cursorAlive()) return false
         if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) return false
         const k = event.key
-        return k === Qt.Key_Left || k === Qt.Key_Right || k === Qt.Key_Up || k === Qt.Key_Down
+        const arrow = k === Qt.Key_Left || k === Qt.Key_Right || k === Qt.Key_Up || k === Qt.Key_Down
+        return (arrow && !vimKeysOnly)
             || k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_Space
     }
 
@@ -515,7 +525,8 @@ Item {
             inner = !Logic.contains(clipOf(t), Logic.grow(r, out))
             const g = inner ? Logic.grow(r, -1) : Logic.grow(r, out)
             if (g.x !== rect.x || g.y !== rect.y || g.w !== rect.w || g.h !== rect.h) rect = g
-            const tr = root.radiusOf(t)
+            // Corners scale with the control (rectOf is its drawn size).
+            const tr = root.radiusOf(t) * (t.width > 0 ? r.w / t.width : 1)
             radius = Math.max(0, Math.min(g.h / 2, g.w / 2, inner ? tr - 1 : (tr > 0 ? tr + out : 0)))
         }
         Timer { id: restoreLater; interval: 30; onTriggered: root.restore() }

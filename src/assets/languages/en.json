@@ -641,6 +641,7 @@
         "items": {
           "title": "Buttons",
           "desc": "Drag buttons to reorder them, or move them to available to hide them",
+          "omarchy": "Omarchy menu",
           "settings": "Settings",
           "launcher": "Launcher",
           "night_light": "Night light",

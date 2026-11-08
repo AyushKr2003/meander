@@ -17,7 +17,7 @@ Meander 2.4.2-2 against Serpantinum 2.4.2 (+10 commits, `246061b`), module by mo
 | Settings app (`guide/`, every tab) | Same | Theme tab gains the "Omarchy" preset (default) |
 | Theme presets, Matugen, fonts, opacity, blur, liquid glass | Same | + "Omarchy" preset from the live `colors.toml`, + "Material" preset (M3 scheme from the Omarchy accent, 9 variants, from Omacale), + Pure black background |
 | App theming (`apptheme.py`, 50 apps) | Same, opt-in | Default list empty: Omarchy themes apps itself |
-| Launcher (apps, files, emoji, calculator, converter, web search) | Same | Ranking and file search from `meander-core` |
+| Launcher (apps, files, emoji, calculator, converter, web search) | Same | Ranking and file search from `meander-core` + `:` lists the Omarchy menu (`omarchy/OmarchyMenu.qml`: Omarchy's own `MenuModel.js` from `$OMARCHY_PATH`, its menu files, catalog and guard batch); Enter runs a row, steps into a submenu (`:Setup › `), or opens Omarchy's menu for provider lists (fonts, kernels, languages). Row icons drawn in the icon font and centred on their ink (upstream used the text font, which put Nerd glyphs 1-3px off-centre once SF Pro was gone) |
 | Clipboard | Omarchy | Omarchy's clipboard history; pins kept by Meander |
 | Notifications (server, popups, centre, types, sounds) | Same, handed over | Runs once `omarchy.notifications` is off; answers Omarchy's `notifications` IPC (DND, dismiss, act, history) |
 | OSD (volume, mic, brightness, caps/num lock, airplane) | Same, handed over | Answers Omarchy's `osd show` (brightness keys); other Omarchy OSD messages become a short notification |
@@ -31,10 +31,12 @@ Meander 2.4.2-2 against Serpantinum 2.4.2 (+10 commits, `246061b`), module by mo
 | Floating quick actions (calculator, notes, timer, draw, system usage, dock) | Same | |
 | Digital wellbeing (day/week/month, heatmap, limits, overlay) | Shim | `meander-core screentime` (SQLite, Hyprland events) |
 | First launch intro + tutorial | Same | Starts from Omarchy's background; `meander open/close` now routed |
-| Weather, location, calendar | Same | |
+| Weather, calendar | Same | |
+| Location | Omarchy-backed | Omarchy's `omarchy-weather-location` (`~/.local/state/omarchy/settings/weather.json`, else `geo.omarchy.org`) instead of upstream's IP lookup; `general.location` is a cache of it, re-resolved when the file changes. Manual coordinates and "auto detect" in Settings write to Omarchy, so Omarchy's weather panel follows. Upstream's IP providers only as a fallback |
 | Media (MPRIS, lyrics, art, visualiser) | Same | |
 | Translations (23 languages) | Same | |
 | Theme picker (`themes` popout) | Meander only | Omarchy themes in the wallpaper picker's carousel (same cards, skew, motion, top bar); rows from `omarchy-theme-switcher --print-rows`, palettes from each `colors.toml` (`meander-core themes`), applied with `omarchy-theme-set` |
+| Bar Menu button "Omarchy menu" (`left` face, `bar.menuItems` id `omarchy`) | Meander only | Omarchy logo (Omarchy's icon font) that toggles Omarchy's command menu (`omarchy-menu toggle`, the `omarchy.menu` plugin stays loaded under Meander); off unless added in Settings → Bar → Menu → Buttons |
 | Keyboard navigation (popouts, bar focus, dock focus) | Meander only | Upstream is pointer-only. A cursor over each surface's controls (arrows/hjkl spatial, Tab reading order, Enter click, Menu right click, sliders on arrows, Ctrl+Tab between panels); Settings keeps upstream's tab keys; Enter steps into the page with the same cursor, Escape steps out (upstream's Escape handling never ran: the popout window's Escape Shortcut closed Settings first). Popout Shortcuts on arrows (calendar) yield while the cursor is shown; upstream's Tab stays in music, volume, network, wallpapers. Hover cards (tray menu, dock app menu, side music card) take the keyboard when opened from bar or dock focus. Music EQ bands moved from the keyboard are applied (upstream applied on mouse release only) |
 
 ## Native helpers

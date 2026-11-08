@@ -72,6 +72,7 @@ singleton ShellSurfaces 1.0 singletons/system/ShellSurfaces.qml
 singleton OmarchyHost 1.0 singletons/system/OmarchyHost.qml
 singleton KeyNavState 1.0 singletons/system/KeyNavState.qml
 OmarchyCompat 1.0 omarchy/OmarchyCompat.qml
+singleton OmarchyMenu 1.0 omarchy/OmarchyMenu.qml
 
 singleton SysData 1.0 singletons/info/SysData.qml
 singleton SystemInfo 1.0 singletons/info/SystemInfo.qml

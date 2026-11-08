@@ -83,7 +83,7 @@ Item {
 
     Process {
         id: autoProcess
-        command: ["bash", "-c", Caching.meanderDir + "/scripts/location.sh --refresh"]
+        command: ["bash", "-c", Caching.meanderDir + "/scripts/location.sh --auto"]
         onExited: {
             root.isDetecting = false;
         }
@@ -97,6 +97,34 @@ Item {
         onExited: {
             root.isDetecting = false;
         }
+    }
+
+    // Meander: the location is Omarchy's (omarchy-weather-location's
+    // weather.json, see scripts/location.sh). Follow edits to it live, as
+    // Omarchy's weather panel does; location.sh is a no-op while the cached
+    // general.location already matches.
+    FileView {
+        path: Quickshell.env("HOME") + "/.local/state/omarchy/settings/weather.json"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: omarchySync.restart()
+        onLoaded: omarchySync.restart()
+        onLoadFailed: omarchySync.restart()
+    }
+
+    Timer {
+        id: omarchySync
+        interval: 1500
+        onTriggered: {
+            if (!Caching.meanderDir || autoProcess.running || manualProcess.running) return;
+            syncProcess.running = false;
+            syncProcess.running = true;
+        }
+    }
+
+    Process {
+        id: syncProcess
+        command: ["bash", "-c", Caching.meanderDir + "/scripts/location.sh >/dev/null"]
     }
 
     Component.onCompleted: {

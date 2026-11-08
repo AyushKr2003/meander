@@ -371,9 +371,15 @@ QtObject {
         types = updated;
     }
 
-    readonly property var menuItemIds: ["settings", "launcher", "nightlight", "caffeine", "shuffle"]
+    // Meander: "omarchy" opens Omarchy's own command menu (omarchy-menu), drawn in Omarchy's icon font.
+    readonly property var menuItemIds: ["omarchy", "settings", "launcher", "nightlight", "caffeine", "shuffle"]
+
+    function menuItemFont(id) {
+        return id === "omarchy" ? "omarchy" : ThemeBackend.iconFont;
+    }
 
     function menuItemIcon(id) {
+        if (id === "omarchy") return "\ue900";
         if (id === "settings") return "󰒓";
         if (id === "launcher") return "󰍉";
         if (id === "nightlight") return "󰖔";

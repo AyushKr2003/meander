@@ -9,7 +9,12 @@ VERBOSE=false
 FORCE_REFRESH=false
 
 for arg in "$@"; do
-    if [[ "$arg" == "--verbose" || "$arg" == "-v" ]]; then
+    if [[ "$arg" == "--auto" ]]; then
+        # Meander: "auto detect" hands the location back to Omarchy's own
+        # detection (geo.omarchy.org) for Omarchy's panel as well.
+        command -v omarchy-weather-location >/dev/null 2>&1 && omarchy-weather-location --clear
+        FORCE_REFRESH=true
+    elif [[ "$arg" == "--verbose" || "$arg" == "-v" ]]; then
         VERBOSE=true
     elif [[ "$arg" == "--refresh" || "$arg" == "-r" ]]; then
         FORCE_REFRESH=true
@@ -139,26 +144,105 @@ fetch_ip_location() {
     return 1
 }
 
-resolve_location() {
-    local existing
-    existing="$(get_existing_location)"
+# Meander: the location is Omarchy's. omarchy-weather-location owns
+# ~/.local/state/omarchy/settings/weather.json ({"name", "latitude"?,
+# "longitude"?}); with no file, geo.omarchy.org places the network (the same
+# order Omarchy's weather panel uses). general.location stays a cache in
+# upstream's shape, keyed by omarchy_key so an edit to weather.json (from
+# Omarchy's panel or the CLI) re-resolves it. The IP providers above are only
+# a fallback for when Omarchy has no answer.
+OMARCHY_LOC_FILE="$HOME/.local/state/omarchy/settings/weather.json"
 
-    local source
-    source="$(echo "$existing" | jq -r '.source // empty' 2>/dev/null)"
+omarchy_location_key() {
+    if [[ -s "$OMARCHY_LOC_FILE" ]] && jq -e '(.name // "" | length) > 0 or .latitude != null' "$OMARCHY_LOC_FILE" >/dev/null 2>&1; then
+        jq -cS '{name, latitude, longitude}' "$OMARCHY_LOC_FILE" 2>/dev/null
+    else
+        echo "auto"
+    fi
+}
 
-    if [[ "$source" == "manual" && "$FORCE_REFRESH" == "false" ]]; then
-        echo "$existing"
+# Open-Meteo geocoding (what Omarchy's location picker searches): the result
+# nearest to lat/lon when given, else the first. Prints one result or nothing.
+geocode_name() {
+    local name="$1" lat="${2:-}" lon="${3:-}" resp
+    resp="$(curl -fsS --max-time 6 -G "https://geocoding-api.open-meteo.com/v1/search" \
+        --data-urlencode "name=$name" -d count=10 -d language=en -d format=json 2>/dev/null)"
+    echo "$resp" | jq -c --arg lat "$lat" --arg lon "$lon" '
+        (.results // []) | if length == 0 then empty
+        elif ($lat == "" or $lon == "") then .[0]
+        else min_by(((.latitude - ($lat|tonumber)) | . * .) + ((.longitude - ($lon|tonumber)) | . * .)) end' 2>/dev/null
+}
+
+# Builds upstream's location object from a name, coordinates and an optional
+# geocoding hit (region, country, timezone).
+omarchy_location_object() {
+    local name="$1" lat="$2" lon="$3" geo="${4:-}" source="$5" key="$6" tz
+    [[ -n "$geo" ]] || geo='{}'
+    tz="$(echo "$geo" | jq -r '.timezone // empty')"
+    if [[ -z "$tz" ]]; then
+        tz="$(curl -fsS --max-time 6 "https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&timezone=auto" 2>/dev/null | jq -r '.timezone // empty' 2>/dev/null)"
+    fi
+    jq -n --arg name "$name" --argjson lat "$lat" --argjson lon "$lon" --argjson geo "$geo" \
+        --arg tz "${tz:-UTC}" --arg source "$source" --arg key "$key" '{
+            latitude: $lat,
+            longitude: $lon,
+            city: (if $name != "" then $name else ($geo.name // "Unknown") end),
+            region: ($geo.admin1 // "Unknown"),
+            country_name: ($geo.country // "Unknown"),
+            country_code: ($geo.country_code // null),
+            postal: (($geo.postcodes // [])[0] // null),
+            timezone: $tz,
+            source: $source,
+            omarchy_key: $key
+        }'
+}
+
+fetch_omarchy_location() {
+    local key="$1" name lat lon geo resp
+    if [[ "$key" == "auto" ]]; then
+        log_debug "No Omarchy location set. Asking geo.omarchy.org..."
+        resp="$(curl -fsS --max-time 5 https://geo.omarchy.org/ 2>/dev/null)"
+        echo "$resp" | jq -e '.latitude != null and .longitude != null' >/dev/null 2>&1 || return 1
+        name="$(echo "$resp" | jq -r '.name // ""')"
+        lat="$(echo "$resp" | jq -r '.latitude')"
+        lon="$(echo "$resp" | jq -r '.longitude')"
+        geo="$(geocode_name "$name" "$lat" "$lon")"
+        [[ -n "$geo" ]] || geo="$(echo "$resp" | jq -c '{country_code: .country, timezone}')"
+        omarchy_location_object "$name" "$lat" "$lon" "$geo" "geo.omarchy.org" "$key"
         return
     fi
 
-    if [[ "$FORCE_REFRESH" == "false" && -n "$existing" && "$existing" != "null" ]]; then
-        local updated_at current_time diff
+    name="$(echo "$key" | jq -r '.name // "" | if type == "string" then . else "" end')"
+    lat="$(echo "$key" | jq -r '.latitude // empty')"
+    lon="$(echo "$key" | jq -r '.longitude // empty')"
+    if [[ -n "$lat" && -n "$lon" ]]; then
+        log_debug "Omarchy location: $name ($lat, $lon)."
+        geo=""
+        [[ -n "$name" ]] && geo="$(geocode_name "$name" "$lat" "$lon")"
+        omarchy_location_object "$name" "$lat" "$lon" "$geo" "omarchy" "$key"
+        return
+    fi
+    [[ -n "$name" ]] || return 1
+    log_debug "Omarchy location is a name only ($name). Geocoding it..."
+    geo="$(geocode_name "$name")"
+    [[ -n "$geo" ]] || return 1
+    omarchy_location_object "$name" "$(echo "$geo" | jq '.latitude')" "$(echo "$geo" | jq '.longitude')" "$geo" "omarchy" "$key"
+}
+
+resolve_location() {
+    local existing key
+    existing="$(get_existing_location)"
+    key="$(omarchy_location_key)"
+
+    if [[ "$FORCE_REFRESH" == "false" && -n "$existing" && "$existing" != "null" ]] &&
+        [[ "$(echo "$existing" | jq -c '.omarchy_key // empty' 2>/dev/null)" == "$(jq -cn --arg k "$key" '$k')" ]]; then
+        # A stored Omarchy location never goes stale; an auto-detected one is
+        # re-checked once a day, as upstream did.
+        local updated_at diff
         updated_at=$(echo "$existing" | jq -r '.updated_at // 0')
-        current_time=$(date +%s)
-        diff=$((current_time - updated_at))
-        log_debug "Found location in config. Age: $diff seconds."
-        if [ $diff -lt 86400 ]; then
-            log_debug "Config location is fresh. Returning existing data."
+        diff=$(( $(date +%s) - updated_at ))
+        if [[ "$key" != "auto" || $diff -lt 86400 ]]; then
+            log_debug "Cached location matches Omarchy's. Returning it."
             echo "$existing"
             return
         fi
@@ -166,14 +250,17 @@ resolve_location() {
 
     log_debug "Fetching location details..."
     local raw_loc
-    raw_loc="$(fetch_ip_location)"
+    raw_loc="$(fetch_omarchy_location "$key")"
+    if [[ -z "$raw_loc" || "$raw_loc" == "null" ]]; then
+        log_debug "Omarchy gave no location. Falling back to IP providers."
+        raw_loc="$(fetch_ip_location)"
+        [[ -n "$raw_loc" ]] && raw_loc="$(echo "$raw_loc" | jq -c --arg k "$key" '. + {omarchy_key: $k}')"
+    fi
 
     if [[ -n "$raw_loc" && "$raw_loc" != "null" ]]; then
         log_debug "Geolocation retrieved successfully."
-        local now
-        now=$(date +%s)
         local final_loc
-        final_loc=$(echo "$raw_loc" | jq --argjson ts "$now" '. + {updated_at: $ts}')
+        final_loc=$(echo "$raw_loc" | jq -c --argjson ts "$(date +%s)" '. + {updated_at: $ts}')
         save_location "$final_loc"
         echo "$final_loc"
     elif [[ -n "$existing" && "$existing" != "null" ]]; then
@@ -187,6 +274,5 @@ resolve_location() {
         echo "$fallback"
     fi
 }
-
 
 resolve_location

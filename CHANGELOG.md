@@ -4,6 +4,23 @@ What changed in each version of Meander, newest first. Versions are the ones in 
 
 Meander's version is the Serpantinum release it is built on plus a port revision: `2.4.2-1` is the first Meander release on Serpantinum 2.4.2, `2.4.2-2` a Meander-only change on the same base, and `2.4.3-1` the first release after merging Serpantinum 2.4.3. `upstream.json` holds the exact upstream commit; `meander upstream` shows how far behind Serpantinum's latest release and master it is.
 
+## 2.4.2-8 - 2026-11-08
+
+Upstream base: unchanged (Serpantinum v2.4.2 +10 commits, `246061b`).
+
+### Added
+- **launcher**: typing `:` lists Omarchy's command menu; Enter runs a row, steps into a submenu, or opens Omarchy's menu for its provider lists (fonts, kernels, languages)
+- **bar**: an "Omarchy menu" button for the bar Menu (Settings → Bar → Menu → Buttons) that toggles Omarchy's command menu
+
+### Changed
+- **location**: weather, sun times and night light use Omarchy's weather location (`omarchy-weather-location`) instead of an IP lookup; setting a place or auto detect in Settings writes it back to Omarchy, so Omarchy's weather panel follows
+- **windows**: no focus border by default (`meander.lua` `borderSize = 0`)
+
+### Fixed
+- **calendar**: the arrow keys flip the month or weather day again while the keyboard cursor is shown; the cursor moves with h j k l there
+- **keyboard**: the focus ring fits scaled controls (the calendar's hour cards) and their corners
+- **launcher**: Nerd glyph icons are drawn in the icon font and centred
+
 ## 2.4.2-7 - 2026-11-08
 
 Upstream base: unchanged (Serpantinum v2.4.2 +10 commits, `246061b`).

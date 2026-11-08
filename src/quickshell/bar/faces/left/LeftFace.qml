@@ -150,6 +150,7 @@ Item {
     component MenuButton: Item {
         id: menuBtn
         property string glyph: ""
+        property string glyphFont: ThemeBackend.iconFont
         property bool active: false
         property color activeColor: ThemeBackend.peach
         property int glyphYOffset: 0
@@ -170,6 +171,7 @@ Item {
             visible: !root.iconOnly
             cornerRadius: Math.max(0, ThemeBackend.borderRadius - root.s(2))
             buttonIcon: menuBtn.glyph
+            iconFont: menuBtn.glyphFont
             iconOffsetY: menuBtn.glyphYOffset
             iconFontSize: root.s(root.isCompact ? 14 : 15)
             accentColor: menuBtn.active ? menuBtn.activeColor : (root.isCompact ? Qt.lighter(ThemeBackend.surface0, 1.18) : ThemeBackend.surface0)
@@ -183,7 +185,7 @@ Item {
             anchors.verticalCenterOffset: menuBtn.glyphYOffset
             visible: root.iconOnly
             text: menuBtn.glyph
-            font.family: ThemeBackend.iconFont
+            font.family: menuBtn.glyphFont
             font.pixelSize: root.s(root.isCompact ? 15 : 16)
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
@@ -221,12 +223,14 @@ Item {
                 required property string modelData
                 readonly property string itemId: modelData
                 glyph: BarModuleRegistry.menuItemIcon(itemId)
+                glyphFont: BarModuleRegistry.menuItemFont(itemId)
                 glyphYOffset: itemId === "nightlight" ? -1 : 0
                 active: itemId === "nightlight" ? root.nightLightActive : (itemId === "caffeine" ? root.caffeineActive : false)
                 activeColor: itemId === "caffeine" ? Qt.tint(ThemeBackend.peach, "#5c3016") : ThemeBackend.peach
                 onClicked: {
                     if (root.isPreview) return;
-                    if (itemId === "settings") Quickshell.execDetached(["bash", "-c", Caching.meanderDir + "/scripts/qs_manager.sh toggle settings"]);
+                    if (itemId === "omarchy") Quickshell.execDetached(["omarchy-menu", "toggle"]);
+                    else if (itemId === "settings") Quickshell.execDetached(["bash", "-c", Caching.meanderDir + "/scripts/qs_manager.sh toggle settings"]);
                     else if (itemId === "launcher") Quickshell.execDetached(["bash", "-c", Caching.meanderDir + "/scripts/qs_manager.sh toggle launcher"]);
                     else if (itemId === "nightlight") root.toggleNightLight();
                     else if (itemId === "caffeine") root.setCaffeine(!root.caffeineActive);

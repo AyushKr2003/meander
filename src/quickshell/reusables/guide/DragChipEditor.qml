@@ -342,6 +342,7 @@ Item {
                                     anchors.fill: parent
                                     buttonText: chip.info.label || chip.chipId
                                     buttonIcon: chip.info.icon || ""
+                                    iconFont: chip.info.iconFont || ThemeBackend.iconFont
                                     accentColor: ThemeBackend.surface0
                                     textColor: ThemeBackend.text
                                     cornerRadius: ThemeBackend.borderRadius

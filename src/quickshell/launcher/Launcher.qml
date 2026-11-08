@@ -152,6 +152,16 @@ PanelWindow {
         }
     }
 
+    // Meander: guard answers and menu file edits land after the rows were
+    // built; refresh an open ":" list.
+    Connections {
+        target: OmarchyMenu
+        function onChanged() {
+            if (launcherWindow.isVisible && launcherWindow.currentTabIndex === 0 && searchInput.text.trim().startsWith(":"))
+                launcherWindow.executeFilter(searchInput.text);
+        }
+    }
+
     Connections {
         target: (typeof I18n !== "undefined") ? I18n : null
         function onLanguageChanged() {
@@ -509,6 +519,7 @@ PanelWindow {
     }
 
     onIsVisibleChanged: {
+        if (!isVisible) OmarchyMenu.invalidate();
         if (isVisible) {
             tabSwitch.currentIndex = launcherWindow.currentTabIndex;
             restartItemsIntro();
@@ -842,6 +853,12 @@ PanelWindow {
     }
 
     function applyModelItems(filtered) {
+        // Meander: ListModel roles are fixed by the first row, so every row
+        // carries the Omarchy menu roles (":" mode, OmarchyMenu).
+        for (let i = 0; i < filtered.length; i++) {
+            if (filtered[i].omarchyId === undefined) filtered[i].omarchyId = "";
+            if (filtered[i].iconFont === undefined) filtered[i].iconFont = "";
+        }
         let minCount = Math.min(appModel.count, filtered.length);
         for (let i = 0; i < minCount; i++) {
             let cur = appModel.get(i);
@@ -851,6 +868,8 @@ PanelWindow {
                 || cur.description !== target.description
                 || cur.icon !== target.icon
                 || cur.fontIcon !== target.fontIcon
+                || cur.omarchyId !== target.omarchyId
+                || cur.iconFont !== target.iconFont
                 || cur.score !== target.score
                 || cur.command !== target.command
                 || cur.calcResult !== target.calcResult
@@ -937,6 +956,42 @@ PanelWindow {
                     isDir: false
                 });
             }
+        }
+
+        // Meander: ":" lists the Omarchy menu (OmarchyMenu.qml).
+        if (rawTrimmed.startsWith(":")) {
+            let rows = OmarchyMenu.rows(query.replace(/^\s*:/, ""));
+            if (rows.length === 0) {
+                rows.push({
+                    omarchyId: "",
+                    name: ": ...",
+                    description: OmarchyMenu.available
+                        ? (typeof I18n !== "undefined" ? I18n.t("applauncher.omarchy_menu_empty", "Nothing in the Omarchy menu matches") : "Nothing in the Omarchy menu matches")
+                        : (typeof I18n !== "undefined" ? I18n.t("applauncher.omarchy_menu_unavailable", "The Omarchy menu could not be read") : "The Omarchy menu could not be read"),
+                    fontIcon: "\ue900",
+                    iconFont: "omarchy"
+                });
+            }
+            for (let i = 0; i < rows.length; i++) {
+                filtered.push(Object.assign({
+                    desktop_id: "",
+                    icon: "",
+                    score: 10000000 - i,
+                    isCommand: false,
+                    command: "",
+                    isCalc: false,
+                    isSearch: false,
+                    searchUrl: "",
+                    calcResult: "",
+                    isWidget: false,
+                    widgetTarget: "",
+                    isFile: false,
+                    filePath: "",
+                    isDir: false
+                }, rows[i]));
+            }
+            applyModelItems(filtered);
+            return;
         }
 
         if (rawTrimmed.startsWith("?")) {
@@ -1062,6 +1117,15 @@ PanelWindow {
         if (index < 0 || index >= appModel.count) return;
         let item = appModel.get(index);
         if (!item) return;
+
+        if (item.omarchyId) {
+            let next = OmarchyMenu.activate(item.omarchyId);
+            if (next === null) return;
+            if (next === "") { closeLauncher(); return; }
+            searchInput.text = next;
+            executeFilter(next);
+            return;
+        }
 
         if (item.isFile) {
             let script = "p=\"$1\"\n"
@@ -1380,6 +1444,10 @@ PanelWindow {
                     }
 
                     onTextEdited: function(newText) {
+                        if (launcherWindow.currentTabIndex !== 0 && newText.trim().startsWith(":")) {
+                            launcherWindow.currentTabIndex = 0;
+                            return;
+                        }
                         if (launcherWindow.currentTabIndex === 0) {
                             filterApps(newText);
                         } else if (launcherWindow.currentTabIndex === 1) {
@@ -1865,9 +1933,21 @@ PanelWindow {
                                                 }
                                             }
 
+                                            // Meander: center the glyph's ink, not its advance
+                                            // box. Nerd Font glyphs reach the text font by
+                                            // fallback with uneven side bearings, which left
+                                            // icons 1-3px right of center in the box.
+                                            TextMetrics {
+                                                id: delegateGlyphInk
+                                                font: delegateFontIcon.font
+                                                text: delegateFontIcon.text
+                                            }
+
                                             Text {
                                                 id: delegateFontIcon
                                                 anchors.centerIn: parent
+                                                anchors.horizontalCenterOffset: implicitWidth / 2 - (delegateGlyphInk.tightBoundingRect.x + delegateGlyphInk.tightBoundingRect.width / 2)
+                                                anchors.verticalCenterOffset: implicitHeight / 2 - (baselineOffset + delegateGlyphInk.tightBoundingRect.y + delegateGlyphInk.tightBoundingRect.height / 2)
                                                 visible: !delegateIcon.visible
                                                 text: {
                                                     if (model.fontIcon && model.fontIcon !== "") return model.fontIcon;
@@ -1875,7 +1955,7 @@ PanelWindow {
                                                     if (model.isCommand) return "󰆍";
                                                     return "󰵆";
                                                 }
-                                                font.family: ThemeBackend.fontFamily
+                                                font.family: model.iconFont ? model.iconFont : ThemeBackend.iconFont
                                                 font.pixelSize: launcherWindow.s(16)
                                                 color: delegateRoot.isSelected ? ThemeBackend.mauve : ThemeBackend.subtext0
                                                 verticalAlignment: Text.AlignVCenter
