@@ -164,21 +164,26 @@ Item {
         Item {
             Item {
                 id: mediaLayoutContainer
+                // meander: the side padding sits inside the clip (upstream: outside),
+                // so the keyboard focus ring has room around the art; same layout
                 anchors.verticalCenter: parent.verticalCenter
                 anchors.left: parent.left
-                anchors.leftMargin: root.sidePadding
                 anchors.right: parent.right
-                anchors.rightMargin: root.sidePadding
                 height: parent.height
                 clip: true
 
                 Row {
                     id: innerMediaLayout
                     anchors.verticalCenter: parent.verticalCenter
+                    anchors.left: parent.left
+                    anchors.leftMargin: root.sidePadding
                     spacing: root.innerSpacing
 
                     MouseArea {
                         id: mediaInfoMouse
+                        // meander: the keyboard focus ring goes around the art + text,
+                        // not this full-height area (clipped, it would sit on top of them)
+                        property Item keyNavRingItem: infoLayout
                         width: infoLayout.implicitWidth
                         height: mediaLayoutContainer.height
                         hoverEnabled: true

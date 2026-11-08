@@ -37,6 +37,7 @@ import "KeyNavLogic.js" as Logic
 // the shell while loading (in Quickshell's import resolution), so no.
 // Any item can opt in or out: `keyNavTarget: true|false`, `keyNavSkip: true`
 // (the whole subtree), and `keyNavActivate()` replaces the synthetic click.
+// `keyNavRingItem: someItem` draws the ring around that item instead.
 //
 // The owner sizes this item over the surface, sets `scope`, and calls
 // handle(event) from a Keys.onPressed above the scope: keys a focused child
@@ -625,13 +626,17 @@ Item {
             const t = root.cursor
             if (!t || !root.active || !root.keyMode) { rect = { x: 0, y: 0, w: 0, h: 0 }; return }
             if (!root.cursorAlive()) { rect = { x: 0, y: 0, w: 0, h: 0 }; restoreLater.restart(); return }
-            const r = root.rectOf(t)
+            // The ring goes around `keyNavRingItem` when the stop names one
+            // (a click area much bigger than what it draws: the bar's media
+            // info spans the full bar height in a clipped row).
+            const s = (t.keyNavRingItem && t.keyNavRingItem.visible) ? t.keyNavRingItem : t
+            const r = root.rectOf(s)
             const out = gap + thickness
-            const fill = root.fillOf(t)
-            const fg = fill ? root.foregroundOf(t, fill) : ThemeBackend.primary
+            const fill = root.fillOf(s)
+            const fg = fill ? root.foregroundOf(s, fill) : ThemeBackend.primary
             if (!Qt.colorEqual(fg, color)) color = fg
-            if (surfaceFor !== t) { surfaceFor = t; surface = root.surfaceOf(t) }
-            let room = clipOf(t)
+            if (surfaceFor !== s) { surfaceFor = s; surface = root.surfaceOf(s) }
+            let room = clipOf(s)
             if (surface && surface.visible) room = Logic.intersect(room, root.rectOf(surface))
             inner = !!fill || !Logic.contains(room, Logic.grow(r, out))
             const ins = fill ? gap : 1
@@ -639,8 +644,8 @@ Item {
             if (g.x !== rect.x || g.y !== rect.y || g.w !== rect.w || g.h !== rect.h) rect = g
             // Corners scale with the control (rectOf is its drawn size); a
             // square corner stays square.
-            const k = t.width > 0 ? r.w / t.width : 1
-            const cs = root.cornersOf(t)
+            const k = s.width > 0 ? r.w / s.width : 1
+            const cs = root.cornersOf(s)
             const fit = v => Math.max(0, Math.min(g.h / 2, g.w / 2, inner ? v * k - ins : (v > 0 ? v * k + out : 0)))
             tl = fit(cs.tl); tr = fit(cs.tr); bl = fit(cs.bl); br = fit(cs.br)
         }
