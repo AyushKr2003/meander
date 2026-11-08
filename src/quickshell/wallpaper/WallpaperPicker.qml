@@ -70,6 +70,60 @@ Item {
         window.triggerIndexer();
     }
 
+    // Meander: the default srcDir is Omarchy's current/theme/backgrounds, and
+    // omarchy-theme-set replaces current/theme (rm -rf + mv), so after a switch
+    // a new folder sits at the same path. The folder model's watch dies with
+    // the old one, a theme with as many backgrounds never changes the count
+    // (which is all that re-ran the indexer), and same-named files (18 themes
+    // ship omarchy.webp) come back from the image cache as the old theme's.
+    // Omarchy's own picker (omarchy-theme-bg-switcher -> omarchy-menu-images)
+    // rescans on every open and keys a file by path + size + mtime; do the
+    // same: rescan on open and on every switch, and give each image's fileUrl
+    // a key (indexer.py: size and mtime). The key is part of the card's own
+    // data, so a card never reloads under itself: a global stamp reloaded the
+    // old theme's cards while their files were gone, and Qt caches the failed
+    // load. A file seen before the indexer has run is keyed by the switch, and
+    // a switch forgets the old theme's entries so none of them is reused.
+    property string themeStamp: ""
+    function keyedUrl(url) {
+        if (!url || window.isVideoTarget(url)) return url;
+        return url + (url.indexOf("?") === -1 ? "?" : "&") + "v=t" + window.themeStamp;
+    }
+
+    function rescanSource(themeSwitched) {
+        if (themeSwitched) {
+            window.themeStamp = String(Date.now());
+            window.initialFocusSet = false;
+            window.srcNameLookup = {};
+            window.thumbLookup = {};
+            window.colorMap = {};
+            window.bucketMap = {};
+        }
+        srcModel.folder = "";
+        srcModel.folder = Qt.binding(() => "file://" + window.srcDir);
+        window.triggerIndexer();
+    }
+
+    FileView {
+        path: Quickshell.env("HOME") + "/.local/state/omarchy/current/theme.name"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: themeSwitchDebounce.restart()
+    }
+
+    Timer {
+        id: themeSwitchDebounce
+        interval: 400
+        onTriggered: {
+            window.rescanSource(true);
+            if (window.visible) {
+                window.trackerResolved = false;
+                wallpaperMonitorTracker.running = false;
+                wallpaperMonitorTracker.running = true;
+            }
+        }
+    }
+
     Connections {
         target: Config
         function onSettingsLoaded() {
@@ -346,6 +400,10 @@ Item {
         command: [
             "bash",
             "-c",
+            // Meander: while Omarchy draws the background, its link names the
+            // current one (what omarchy-theme-bg-switcher selects); the mirrored
+            // name files trail it by up to one poll.
+            (OmarchyHost.ownsBackground ? "" : "p=$(readlink -f '" + OmarchyHost.currentBackground + "' 2>/dev/null) && [ -f \"$p\" ] && { printf '%s\\n' \"${p##*/}\"; exit 0; }; ") +
             "cat '" + Caching.getCacheDir("wallpaper") + "/current_" + (masterWindow.screen ? masterWindow.screen.name : "") + "_name' 2>/dev/null || cat '" + Caching.getCacheDir("wallpaper") + "/current_default_name' 2>/dev/null || echo ''"
         ]
         stdout: StdioCollector {
@@ -683,6 +741,7 @@ Item {
 
     function refreshForDisplay() {
         window._refreshedForDisplay = true;
+        window.rescanSource(false); // meander: see themeStamp
         if (!window.targetWallName) {
             let scName = masterWindow.screen ? masterWindow.screen.name : "";
             let current = (typeof Wallpaper !== "undefined") ? Wallpaper.getWallpaper(scName) : "";
@@ -968,7 +1027,7 @@ Item {
             let item = cached ? cached : {
                 "fileName": sFn,
                 "filePath": decodeURIComponent(sFu.replace("file://", "")),
-                "fileUrl": sFu,
+                "fileUrl": isVid ? sFu : window.keyedUrl(sFu), // meander: see themeStamp
                 "isVideo": isVid,
                 "posterPath": "",
                 "posterUrl": "",
@@ -1967,6 +2026,11 @@ Item {
                                         let currentSrc = paperImage.source;
                                         paperImage.source = "";
                                         paperImage.source = currentSrc;
+                                        // Meander: keep following the model (its
+                                        // URL carries the file key, see themeStamp);
+                                        // a plain assignment left the card on a
+                                        // dead URL for good.
+                                        paperImage.source = Qt.binding(() => delegateRoot.isVideo ? (delegateRoot.itemPosterUrl !== "" ? delegateRoot.itemPosterUrl : "") : delegateRoot.itemFileUrl);
                                     }
                                 }
                             }

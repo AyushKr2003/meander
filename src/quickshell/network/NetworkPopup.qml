@@ -88,7 +88,29 @@ Item {
         if (t === "wifi" && popupWindowRoot.wifiPresent) popupWindowRoot.activeMode = "wifi";
         else if (t === "bt" && popupWindowRoot.btPresent) popupWindowRoot.activeMode = "bt";
         else if (t === "eth" && popupWindowRoot.ethPresent) popupWindowRoot.activeMode = "eth";
+        // Meander: remember it for this opening (see requestedTab).
+        if (t === "wifi" || t === "bt" || t === "eth") popupWindowRoot.requestedTab = t;
     }
+
+    // Meander: the tab asked for by this opening (Omarchy's SUPER+CTRL+N/B,
+    // a bar button, the CLI), until the user picks another one or the popout
+    // closes. It beats the last tab in the mode file, which modeFile re-reads
+    // on open and applies once that device turns up (Bluetooth comes a moment
+    // later): that flipped SUPER+CTRL+N to Bluetooth. A tab whose device is
+    // not up yet is applied when it is.
+    property string requestedTab: ""
+    function applyRequestedTab() {
+        let t = popupWindowRoot.requestedTab;
+        if (!popupWindowRoot.visible || t === "" || popupWindowRoot.activeMode === t) return;
+        if ((t === "wifi" && popupWindowRoot.wifiPresent) ||
+            (t === "bt" && popupWindowRoot.btPresent) ||
+            (t === "eth" && popupWindowRoot.ethPresent)) {
+            popupWindowRoot.activeMode = t;
+        }
+    }
+    onWifiPresentChanged: applyRequestedTab()
+    onBtPresentChanged: applyRequestedTab()
+    onEthPresentChanged: applyRequestedTab()
 
     property real introState: 0.0
     Behavior on introState {
@@ -171,6 +193,7 @@ Item {
             popupWindowRoot.fetchConnectivityData();
             if (popupWindowRoot.activeMode === "bt" && !btProfilePoller.running) btProfilePoller.running = true;
         } else {
+            popupWindowRoot.requestedTab = "";
             exitAnim.stop();
             popupWindowRoot.exitOpacity = 1.0;
             popupWindowRoot.stopBtScan();
@@ -652,6 +675,8 @@ Item {
         watchChanges: popupWindowRoot.visible
         onFileChanged: reload()
         onLoaded: {
+            // Meander: a tab asked for by this opening wins (requestedTab).
+            if (popupWindowRoot.requestedTab !== "") return;
             let mode = text().trim();
             if ((mode === "wifi" || mode === "bt" || mode === "eth") && popupWindowRoot.activeMode !== mode) {
                 if ((mode === "eth" && popupWindowRoot.ethPresent) ||
@@ -897,6 +922,8 @@ Item {
     }
 
     onActiveModeChanged: {
+        // Meander: the user picked another tab (pills, Tab key): theirs now.
+        if (popupWindowRoot.activeMode !== popupWindowRoot.requestedTab) popupWindowRoot.requestedTab = "";
         popupWindowRoot.cardIntroDelay = 0;
         if (!popupWindowRoot.ignoreNextModeFileUpdate) {
             modeFileWriter.setText(popupWindowRoot.activeMode + "\n");

@@ -255,7 +255,8 @@ Item {
         command: ["bash", "-c",
             "link=\"$1\"; cache=\"$2\"; force=\"$3\"; shift 3\n" +
             "p=$(readlink -f \"$link\" 2>/dev/null); [ -n \"$p\" ] && [ -f \"$p\" ] || exit 0\n" +
-            "if [ \"$force\" = 1 ] || [ \"$(cat \"$cache/omarchy_mirror\" 2>/dev/null)\" != \"$p\" ]; then\n" +
+            "key=\"$p $(stat -Lc '%i:%s:%Y' \"$p\" 2>/dev/null)\"\n" +
+            "if [ \"$force\" = 1 ] || [ \"$(cat \"$cache/omarchy_mirror\" 2>/dev/null)\" != \"$key\" ]; then\n" +
             "  mkdir -p \"$cache\"; snap=\"$cache/current_wallpaper.png\"; tmp=\"$snap.tmp.$$\"\n" +
             "  case \"${p,,}\" in\n" +
             "    *.mp4|*.mkv|*.mov|*.webm) ffmpeg -y -hide_banner -loglevel error -ss 00:00:01 -i \"$p\" -frames:v 1 -c:v png -f image2 \"$tmp\" 2>/dev/null || ffmpeg -y -hide_banner -loglevel error -i \"$p\" -frames:v 1 -c:v png -f image2 \"$tmp\" 2>/dev/null ;;\n" +
@@ -268,7 +269,7 @@ Item {
             "  done\n" +
             "  h=\"$cache/history.txt\"; n=\"${p##*/}\"\n" +
             "  { printf '%s\\n' \"$n\"; grep -v -F -x -- \"$n\" \"$h\" 2>/dev/null; } > \"$h.tmp\" && mv -f \"$h.tmp\" \"$h\"\n" +
-            "  printf '%s' \"$p\" > \"$cache/omarchy_mirror\"; echo changed\n" +
+            "  printf '%s' \"$key\" > \"$cache/omarchy_mirror\"; echo changed\n" +
             "fi\n" +
             "echo \"$p\"",
             "_", OmarchyHost.currentBackground, Caching.getCacheDir("wallpaper"), compat.mirrorForce ? "1" : "0"
@@ -301,8 +302,15 @@ Item {
         }
     }
 
+    // The mirror keys the background by path + inode/size/mtime, as Omarchy's
+    // own picker keys its thumbnails: a theme switch swaps current/theme for a
+    // new copy, and 18 themes name their background omarchy.webp, so the path
+    // alone stays the same while the image changes.
+    //
     // Omarchy changes the background through its own plugin, which Meander
-    // can't hear; the link is cheap to read.
+    // can't hear; the link is cheap to read. A theme switch rewrites
+    // theme.name just before it repoints the link: look again right away and
+    // once the link has moved, instead of waiting for the next poll.
     Timer {
         interval: 2000
         repeat: true
@@ -310,6 +318,24 @@ Item {
         running: !OmarchyHost.ownsBackground
         onRunningChanged: if (running) compat.mirrorForce = true
         onTriggered: if (!mirrorProc.running) mirrorProc.running = true
+    }
+
+    FileView {
+        path: OmarchyHost.ownsBackground ? "" : Quickshell.env("HOME") + "/.local/state/omarchy/current/theme.name"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: themeSwitchMirror.kick()
+    }
+
+    Timer {
+        id: themeSwitchMirror
+        interval: 700
+        property int left: 0
+        onTriggered: {
+            if (!mirrorProc.running) mirrorProc.running = true;
+            if (--left > 0) restart();
+        }
+        function kick() { left = 3; restart(); }
     }
 
     Commons.ShellIpc {

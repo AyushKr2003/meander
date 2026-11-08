@@ -243,7 +243,14 @@ if [[ "$ACTION" == "open" || "$ACTION" == "toggle" ]]; then
     case "$TARGET" in
         network)
             [[ -d "$QS_NETWORK_CACHE" ]] || mkdir -p "$QS_NETWORK_CACHE"
-            [[ -n "$SUBTARGET" ]] && echo "$SUBTARGET" > "$NETWORK_MODE_FILE"
+            if [[ -n "$SUBTARGET" ]]; then
+                # Meander: the open popout watches this file and switches tab
+                # as soon as it changes, often before the IPC below lands. A
+                # toggle to another tab is then a switch, never a close.
+                PREV_MODE="$(cat "$NETWORK_MODE_FILE" 2>/dev/null)"
+                [[ "$ACTION" == "toggle" && -n "$PREV_MODE" && "$PREV_MODE" != "$SUBTARGET" ]] && ACTION="open"
+                echo "$SUBTARGET" > "$NETWORK_MODE_FILE"
+            fi
             ;;
         wallpaper)
             handle_wallpaper_prep

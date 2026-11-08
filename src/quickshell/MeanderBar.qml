@@ -25,7 +25,7 @@ Item {
     property var shell: null
     property var manifest: null
 
-    readonly property string version: manifest && manifest.version ? manifest.version : "2.4.2-6"
+    readonly property string version: manifest && manifest.version ? manifest.version : "2.4.2-7"
 
     // Created first thing, so the notification server (when Meander owns it,
     // see OmarchyHost.fileOwns) is on the bus before the rest of the bar has
@@ -82,16 +82,25 @@ Item {
         return true;
     }
 
+    // Wi-Fi and Bluetooth share one popout (network, tabs wifi/bt). Omarchy's
+    // toggle asks isBarWidgetOpen first and hides on true, so a widget counts
+    // as open only while its popout shows its own tab: SUPER+CTRL+B over the
+    // Wi-Fi tab then switches to Bluetooth instead of closing the panel.
+    function shows(t) {
+        if (!t || !mainWindow || mainWindow.activeWidget !== t[0]) return false;
+        let tab = t[1] ? mainWindow.activeTab() : "";
+        return tab === "" || tab === t[1];
+    }
+
     function hideBarWidget(id) {
         let t = root.targetFor(id);
         if (!t || !mainWindow) return false;
-        if (mainWindow.activeWidget === t[0]) mainWindow.runCommand("close", "", "");
+        if (root.shows(t)) mainWindow.runCommand("close", "", "");
         return true;
     }
 
     function isBarWidgetOpen(id) {
-        let t = root.targetFor(id);
-        return !!(t && mainWindow && mainWindow.activeWidget === t[0]);
+        return root.shows(root.targetFor(id));
     }
 
     function panelWidgetIdAt(section, index) { return ""; }

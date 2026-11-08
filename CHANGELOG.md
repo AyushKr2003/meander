@@ -4,6 +4,15 @@ What changed in each version of Meander, newest first. Versions are the ones in 
 
 Meander's version is the Serpantinum release it is built on plus a port revision: `2.4.2-1` is the first Meander release on Serpantinum 2.4.2, `2.4.2-2` a Meander-only change on the same base, and `2.4.3-1` the first release after merging Serpantinum 2.4.3. `upstream.json` holds the exact upstream commit; `meander upstream` shows how far behind Serpantinum's latest release and master it is.
 
+## 2.4.2-7 - 2026-11-08
+
+Upstream base: unchanged (Serpantinum v2.4.2 +10 commits, `246061b`).
+
+### Fixed
+- **wallpapers**: after a theme switch the wallpaper picker could keep showing the previous theme's backgrounds (same number of files, or same file names such as `omarchy.webp`); like Omarchy's own picker it now rescans on every open and every theme switch, and tells files apart by size and time, not only by name
+- **background**: the lock screen, blur and Settings previews kept the old theme's wallpaper when the new theme's background had the same path; Meander now follows the image itself and picks up a theme switch right away
+- **network**: SUPER+CTRL+N and SUPER+CTRL+B open the Wi-Fi or Bluetooth tab they ask for, and switch tabs instead of closing the panel when it already shows the other one
+
 ## 2.4.2-6 - 2026-11-08
 
 Upstream base: unchanged (Serpantinum v2.4.2 +10 commits, `246061b`).

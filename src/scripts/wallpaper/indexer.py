@@ -128,9 +128,18 @@ def generate_video_poster(video_path, poster_path):
 def process_entry(entry_tuple, poster_dir, cached_items):
     fname, fpath, mtime, size, is_video = entry_tuple
     furl = f"file://{fpath}"
+    # Meander: an image's URL carries its size and mtime, as Omarchy's image
+    # selector keys its thumbnails. Omarchy's current/theme/backgrounds is a
+    # new copy at the same path after every theme switch and themes reuse file
+    # names (omarchy.webp), so the bare path brought the previous theme's
+    # picture back from the picker's image cache. Qt drops the query when it
+    # opens the file. Videos keep the bare path (their player gets it).
+    if not is_video:
+        furl = f"{furl}?v={mtime}-{size}"
 
     existing = cached_items.get(fname)
     if existing and existing.get("mtime") == mtime and existing.get("size") == size:
+        existing["fileUrl"] = furl
         if is_video:
             p_path = existing.get("posterPath", "")
             if p_path and os.path.exists(p_path) and os.path.getsize(p_path) > 512:
@@ -139,7 +148,11 @@ def process_entry(entry_tuple, poster_dir, cached_items):
             return existing
 
     if is_video:
-        poster_name = f"{hashlib.sha256(fname.encode('utf-8')).hexdigest()[:16]}.jpg"
+        # Meander: name + size + mtime, as Omarchy's image selector keys its
+        # thumbnails. Omarchy's current/theme/backgrounds is a new copy after
+        # every theme switch, and themes reuse file names, so the name alone
+        # handed out the previous theme's poster.
+        poster_name = f"{hashlib.sha256(f'{fname}:{size}:{mtime}'.encode('utf-8')).hexdigest()[:16]}.jpg"
         poster_path = os.path.join(poster_dir, poster_name)
         generate_video_poster(fpath, poster_path)
         poster_url = f"file://{poster_path}"

@@ -98,6 +98,12 @@ PanelWindow {
         mainIpc.handleCommand(cmd || "", targetWidget || "", arg || "");
     }
     readonly property string activeWidget: masterWindow.isVisible && !masterWindow.isClosing ? masterWindow.currentActive : "hidden"
+    // The tab the open popout shows (network: wifi/bt/eth), "" if it has none.
+    function activeTab() {
+        if (activeWidget === "hidden") return "";
+        let it = widgetCache[currentActive];
+        return (it && it.activeMode !== undefined) ? String(it.activeMode) : "";
+    }
 
     IpcHandler {
         id: mainIpc
@@ -193,8 +199,13 @@ PanelWindow {
             } else if (cmd === "toggle" || cmd === "open") {
                 if (targetWidget === effectivelyActive) {
                     let currentItem = widgetCache[targetWidget] || widgetStack.currentItem;
+                    // Meander: activeArg is only the arg the popout opened
+                    // with; the network tabs can change it since. Compare with
+                    // the tab it shows, and let "open" always go to the tab
+                    // (Omarchy's SUPER+CTRL+N/B, qs_manager on a tab change).
+                    let shownTab = (currentItem && currentItem.activeMode !== undefined) ? String(currentItem.activeMode) : masterWindow.activeArg;
 
-                    if (arg !== "" && arg !== masterWindow.activeArg) {
+                    if (arg !== "" && (cmd === "open" || arg !== shownTab)) {
                         masterWindow.activeArg = arg;
                         if (currentItem && currentItem.activeMode !== undefined) {
                             currentItem.activeMode = arg;

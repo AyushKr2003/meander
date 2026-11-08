@@ -196,7 +196,7 @@ Rectangle {
 
                     BoundedImage {
                         anchors.fill: parent
-                        source: tile.tab.isWallpaperVideo ? ("file://" + Caching.getCacheDir("wallpaper") + "/current_wallpaper.png?rev=" + tile.tab.wallpaperRevision) : (tile.tab.currentWallpaperPath ? "file://" + tile.tab.currentWallpaperPath : "")
+                        source: tile.tab.isWallpaperVideo ? ("file://" + Caching.getCacheDir("wallpaper") + "/current_wallpaper.png?rev=" + tile.tab.wallpaperRevision) : (tile.tab.currentWallpaperPath ? "file://" + tile.tab.currentWallpaperPath + (tile.tab.wallpaperRevision > 0 ? "?rev=" + tile.tab.wallpaperRevision : "") : "") // meander: same path, new image after an Omarchy theme switch (as ThemePresetTile)
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
                         smooth: true

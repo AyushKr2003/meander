@@ -189,7 +189,7 @@ Item {
         BoundedImage {
             id: wpCardImage
             anchors.fill: parent
-            source: wpPreviewContainer.tab.isWallpaperVideo ? ("file://" + Caching.getCacheDir("wallpaper") + "/current_wallpaper.png?rev=" + wpPreviewContainer.tab.wallpaperRevision) : (wpPreviewContainer.tab.currentWallpaperPath ? "file://" + wpPreviewContainer.tab.currentWallpaperPath : "")
+            source: wpPreviewContainer.tab.isWallpaperVideo ? ("file://" + Caching.getCacheDir("wallpaper") + "/current_wallpaper.png?rev=" + wpPreviewContainer.tab.wallpaperRevision) : (wpPreviewContainer.tab.currentWallpaperPath ? "file://" + wpPreviewContainer.tab.currentWallpaperPath + (wpPreviewContainer.tab.wallpaperRevision > 0 ? "?rev=" + wpPreviewContainer.tab.wallpaperRevision : "") : "") // meander: same path, new image after an Omarchy theme switch (as ThemePresetTile)
             fillMode: Image.PreserveAspectCrop
             asynchronous: true
             smooth: true
