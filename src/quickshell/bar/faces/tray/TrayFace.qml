@@ -28,9 +28,10 @@ Item {
 
     property bool showLayout: false
 
-    readonly property real iconSize: barWindow ? barWindow.cs(isCompact ? 15 : 16) : (isCompact ? 15 : 16)
+    // Meander: tray icons a step larger than upstream (15/16), padding trimmed to match, so they read like the other bar glyphs.
+    readonly property real iconSize: barWindow ? barWindow.cs(isCompact ? 20 : 22) : (isCompact ? 20 : 22)
     readonly property real itemSpacing: barWindow ? barWindow.cs(isCompact ? 8 : 10) : (isCompact ? 8 : 10)
-    readonly property real iconPadding: barWindow ? barWindow.cs(isCompact ? 10 : 12) : (isCompact ? 10 : 12)
+    readonly property real iconPadding: barWindow ? barWindow.cs(isCompact ? 8 : 9) : (isCompact ? 8 : 9)
     readonly property real totalPadding: iconPadding * 2
     readonly property int itemCount: ((!module || module.moduleActive) && trayRepeater.count > 0) ? trayRepeater.count : 0
 
