@@ -732,40 +732,15 @@ Item {
                                                     color: ThemeBackend.green
                                                 }
 
-                                                Image {
-                                                    id: groupHeaderIcon
+                                                // The app's icon as Omarchy's toast resolves it (no
+                                                // sender picture: the header stands for the app).
+                                                NotifIcon {
                                                     anchors.fill: parent
-                                                    source: {
-                                                        if (groupWrapper.customType !== "default") return "";
-                                                        let ic = "";
-                                                        if (typeof icon !== "undefined" && icon) {
-                                                            ic = icon;
-                                                        } else if (typeof appIcon !== "undefined" && appIcon) {
-                                                            ic = appIcon;
-                                                        } else if (groupWrapper.memberList && groupWrapper.memberList.length > 0) {
-                                                            let first = groupWrapper.memberList[0];
-                                                            if (first) {
-                                                                ic = first.appIcon || first.icon || first.iconPath || "";
-                                                            }
-                                                        }
-                                                        if (!ic) return "";
-                                                        if (ic.startsWith("file://") || ic.startsWith("image://") || ic.startsWith("http://") || ic.startsWith("https://")) return ic;
-                                                        return ic.startsWith("/") ? "file://" + ic : "image://icon/" + ic;
-                                                    }
-                                                    sourceSize: Qt.size(48, 48)
-                                                    fillMode: Image.PreserveAspectFit
-                                                    visible: groupWrapper.customType === "default" && status === Image.Ready && source !== ""
-                                                }
-
-                                                Text {
-                                                    anchors.centerIn: parent
-                                                    anchors.horizontalCenterOffset: 1
-                                                    anchors.verticalCenterOffset: -1
-                                                    visible: groupWrapper.customType === "default" && !groupHeaderIcon.visible
-                                                    text: "󰋽"
-                                                    font.family: ThemeBackend.fontFamily
-                                                    font.pixelSize: root.s(22)
-                                                    color: ThemeBackend.liquidGlass ? ThemeBackend.text : ThemeBackend.subtext0
+                                                    visible: groupWrapper.customType === "default"
+                                                    entry: groupWrapper.memberList && groupWrapper.memberList.length > 0 ? Object.assign({}, groupWrapper.memberList[0], { icon: (typeof icon !== "undefined" && icon) ? icon : (groupWrapper.memberList[0].icon || "") }) : null
+                                                    withPicture: false
+                                                    glyphSize: root.s(22)
+                                                    fallbackColor: ThemeBackend.liquidGlass ? ThemeBackend.text : ThemeBackend.subtext0
                                                 }
                                             }
                                         }

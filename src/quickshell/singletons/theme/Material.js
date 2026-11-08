@@ -144,8 +144,10 @@ function scheme(seedHex, variant, light) {
 }
 
 // Settings › Theme › Pure black: dark palettes only. Base, mantle and crust go
-// to #000 and the surface steps to neutral greys just above it, so cards and
-// hover states still read on black.
+// to #000 and the surface steps just above it, so cards and hover states still
+// read on black. The steps keep the hue and chroma of the palette's own
+// surfaces at the lightness of #141414/#1f1f1f/#2a2a2a: flat greys there left
+// popups and panel cards off-theme next to the themed bar.
 function pureBlack(palette) {
     const b = parseHex(palette.base);
     const lum = 0.2126 * b.r + 0.7152 * b.g + 0.0722 * b.b;
@@ -155,8 +157,11 @@ function pureBlack(palette) {
     out.base = "#000000";
     out.mantle = "#000000";
     out.crust = "#000000";
-    out.surface0 = "#141414";
-    out.surface1 = "#1f1f1f";
-    out.surface2 = "#2a2a2a";
+    const steps = { surface0: "#141414", surface1: "#1f1f1f", surface2: "#2a2a2a" };
+    for (const k in steps) {
+        const grey = toLch(parseHex(steps[k]));
+        const own = palette[k] ? toLch(parseHex(palette[k])) : { c: 0, h: 0 };
+        out[k] = tone({ h: own.h, c: own.c }, grey.l);
+    }
     return out;
 }

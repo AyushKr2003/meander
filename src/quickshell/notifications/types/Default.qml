@@ -12,34 +12,14 @@ Notification {
     fullSummary: model ? (model.summary || I18n.t("notifications.types.default.fallback_summary")) : ""
     fullBody: model ? (model.body || "") : ""
 
+    // Omarchy's icon order (sender picture, app icon, glyph); see NotifIcon.
     iconArea: [
-        Item {
+        NotifIcon {
             anchors.fill: parent
-
-            Image {
-                id: notifIcon
-                anchors.fill: parent
-                source: {
-                    let ic = model ? (model.icon || model.iconPath || "") : "";
-                    if (!ic) return "";
-                    if (ic.startsWith("file://") || ic.startsWith("image://") || ic.startsWith("http://") || ic.startsWith("https://")) return ic;
-                    return ic.startsWith("/") ? "file://" + ic : "image://icon/" + ic;
-                }
-                sourceSize: Qt.size(48, 48)
-                fillMode: Image.PreserveAspectFit
-                visible: status === Image.Ready && source !== ""
-            }
-
-            Text {
-		anchors.centerIn: parent
-		anchors.horizontalCenterOffset: 1
-		anchors.verticalCenterOffset: -1
-                visible: !notifIcon.visible
-                text: "󰋽"
-                font.family: ThemeBackend.fontFamily
-                font.pixelSize: s(22)
-                color: faceRoot.bodyText
-            }
+            entry: faceRoot.model
+            radius: s(5)
+            glyphSize: s(22)
+            fallbackColor: faceRoot.bodyText
         }
     ]
 

@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Services.Notifications
+import Quickshell.Io
 import "../"
 
 Item {
@@ -31,6 +32,183 @@ Item {
     })
 
     signal popupAdded(int uid, var notif)
+
+    // ---------------------------------------------------------- history
+    // Upstream's history held only notifications still open: an entry left
+    // as its notification closed (the app withdrew it, it expired, its popup
+    // was closed) and with the shell. Omarchy's daemon keeps closed ones
+    // until they are cleared, and that history is what Omacale's sidebar
+    // shows, so Meander keeps them too, on disk, with Omarchy's retention
+    // (its Store.js: newest first, 100 rows, 24 hours). Notifications
+    // Omarchy's daemon recorded before Meander took over are read in once
+    // from its history.json (rc/edge/dev layout; read only).
+    readonly property int historyLimit: 100
+    readonly property real historyRetentionMs: 24 * 3600 * 1000
+    readonly property string historyPath: Caching.getStateDir("notifications") + "/history.json"
+    readonly property string omarchyHistoryPath: Caching.home + "/.local/state/omarchy/notifications/history.json"
+    property bool historyLoaded: false
+    // closed_ts (seconds) of the newest Omarchy row already read in, so a
+    // row the user dismissed here doesn't come back on the next start.
+    property real omarchyImportedUntil: 0
+    property var _storedRows: []
+
+    function _storable(nData) {
+        let image = String(nData.image || "");
+        // image:// URLs belong to the live notification and die with it.
+        if (image.indexOf("image://") === 0) image = "";
+        return {
+            "appName": String(nData.appName || "System"),
+            "summary": String(nData.summary || ""),
+            "body": String(nData.body || ""),
+            "iconPath": String(nData.iconPath || ""),
+            "image": image,
+            // A qsimage picture dies with the notification; a file path stays.
+            "senderImage": /^image:\/\/qsimage\//.test(String(nData.senderImage || "")) ? "" : String(nData.senderImage || ""),
+            "desktopEntry": String(nData.desktopEntry || ""),
+            "glyph": String(nData.glyph || ""),
+            "timestamp": Number(nData.timestamp) || Date.now(),
+            "urgency": Number(nData.urgency) || 0,
+            "read": Boolean(nData.read)
+        };
+    }
+
+    function _restored(row) {
+        root.popupCounter++;
+        let image = String(row.image || "");
+        return {
+            "appName": String(row.appName || "System"),
+            "summary": String(row.summary || ""),
+            "body": String(row.body || ""),
+            "iconPath": String(row.iconPath || ""),
+            "image": image,
+            "imagePath": image,
+            "senderImage": String(row.senderImage || ""),
+            "desktopEntry": String(row.desktopEntry || ""),
+            "glyph": String(row.glyph || ""),
+            // Its actions went with the sender's notification.
+            "actionsJson": "[]",
+            "hasActions": false,
+            "uid": root.popupCounter,
+            "timestamp": Number(row.timestamp) || 0,
+            "urgency": Number(row.urgency) || 0,
+            "read": Boolean(row.read)
+        };
+    }
+
+    // Drops what Omarchy's retention would: past the row limit or the window.
+    function pruneHistory() {
+        let cutoff = Date.now() - root.historyRetentionMs;
+        let changed = false;
+        root._isBatchUpdating = true;
+        for (let i = historyModel.count - 1; i >= 0; i--) {
+            let nData = historyModel.get(i);
+            if (i >= root.historyLimit || !nData || (Number(nData.timestamp) || 0) < cutoff) {
+                if (nData) delete root.liveNotifs[nData.uid];
+                historyModel.remove(i, 1);
+                changed = true;
+            }
+        }
+        root._isBatchUpdating = false;
+        if (changed) rebuildGroups();
+    }
+
+    function _finishHistoryLoad(omarchyText) {
+        let rows = root._storedRows.slice();
+        let until = root.omarchyImportedUntil;
+        let list = [];
+        try { list = JSON.parse(omarchyText || "[]"); } catch (e) { list = []; }
+        if (Array.isArray(list)) {
+            for (let i = 0; i < list.length; i++) {
+                let r = list[i];
+                let closed = r ? Number(r.closed_ts) || 0 : 0;
+                if (!r || typeof r !== "object" || closed <= root.omarchyImportedUntil) continue;
+                until = Math.max(until, closed);
+                rows.push({
+                    "appName": String(r.app || "System"),
+                    "summary": String(r.summary || ""),
+                    "body": String(r.body || ""),
+                    "iconPath": String(r.appIcon || ""),
+                    "image": "",
+                    "senderImage": "",
+                    "desktopEntry": "",
+                    "glyph": String(r.glyph || ""),
+                    "timestamp": Math.round((Number(r.ts) || closed) * 1000),
+                    "urgency": Number(r.urgency) || 0,
+                    "read": true
+                });
+            }
+        }
+        root.omarchyImportedUntil = until;
+        rows.sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+
+        // Anything that arrived while the files were read is newer: it stays on top.
+        root._isBatchUpdating = true;
+        for (let i = 0; i < rows.length && historyModel.count < root.historyLimit; i++)
+            historyModel.append(_restored(rows[i]));
+        root._isBatchUpdating = false;
+        root._storedRows = [];
+        root.historyLoaded = true;
+        pruneHistory();
+        rebuildGroups();
+        saveTimer.restart();
+    }
+
+    function saveHistory() {
+        if (!root.historyLoaded) return;
+        let entries = [];
+        for (let i = 0; i < historyModel.count && entries.length < root.historyLimit; i++) {
+            let nData = historyModel.get(i);
+            if (nData) entries.push(_storable(nData));
+        }
+        historyFile.setText(JSON.stringify({
+            "version": 1,
+            "omarchyImportedUntil": root.omarchyImportedUntil,
+            "entries": entries
+        }));
+    }
+
+    FileView {
+        id: historyFile
+        path: root.historyPath
+        atomicWrites: true
+        printErrors: false
+        onLoaded: {
+            if (root.historyLoaded) return;
+            try {
+                let d = JSON.parse(text());
+                root._storedRows = Array.isArray(d.entries) ? d.entries.filter(r => r && typeof r === "object") : [];
+                root.omarchyImportedUntil = Number(d.omarchyImportedUntil) || 0;
+            } catch (e) {
+                root._storedRows = [];
+            }
+            omarchyHistoryFile.path = root.omarchyHistoryPath;
+        }
+        onLoadFailed: {
+            if (root.historyLoaded) return;
+            omarchyHistoryFile.path = root.omarchyHistoryPath;
+        }
+    }
+
+    FileView {
+        id: omarchyHistoryFile
+        path: ""
+        printErrors: false
+        onLoaded: if (!root.historyLoaded) root._finishHistoryLoad(text())
+        onLoadFailed: if (!root.historyLoaded) root._finishHistoryLoad("[]")
+    }
+
+    Timer {
+        id: saveTimer
+        interval: 400
+        onTriggered: root.saveHistory()
+    }
+
+    Timer {
+        interval: 10 * 60 * 1000
+        running: root.historyLoaded
+        repeat: true
+        onTriggered: root.pruneHistory()
+    }
 
     onSysPanelOpenChanged: {
         if (sysPanelOpen) {
@@ -112,6 +290,7 @@ Item {
     }
 
     function rebuildGroups() {
+        if (root.historyLoaded) saveTimer.restart();
         let groupedMap = {};
         let newOrder = [];
 
@@ -155,10 +334,12 @@ Item {
                 "iconPath": nData.iconPath,
                 "image": nData.image,
                 "imagePath": nData.imagePath,
+                "senderImage": nData.senderImage,
+                "desktopEntry": nData.desktopEntry,
+                "glyph": nData.glyph,
                 "actionsJson": nData.actionsJson,
                 "hasActions": nData.hasActions,
                 "uid": nData.uid,
-                "notif": nData.notif,
                 "timestamp": ts,
                 "urgency": nData.urgency,
                 "read": nData.read
@@ -234,8 +415,10 @@ Item {
 
     function clearNotifications(): void {
         root._isBatchUpdating = true;
-        for (let key in root.liveNotifs) {
-            let n = root.liveNotifs[key];
+        let live = root.liveNotifs;
+        root.liveNotifs = {};
+        for (let key in live) {
+            let n = live[key];
             if (n) {
                 if (typeof n.dismiss === "function") {
                     n.dismiss();
@@ -244,11 +427,32 @@ Item {
                 }
             }
         }
-        root.liveNotifs = {};
         historyModel.clear();
         popupsModel.clear();
         groupedHistoryModel.clear();
         root._isBatchUpdating = false;
+        if (root.historyLoaded) saveTimer.restart();
+    }
+
+    // Omarchy's dismissOne/dismissAll: the popups close, their notifications
+    // go on in the history (as Omarchy's toasts do), unlike clearNotifications.
+    function dismissPopups(newestOnly) {
+        let uids = [];
+        for (let i = 0; i < popupsModel.count; i++) {
+            let p = popupsModel.get(i);
+            if (!p) continue;
+            let list = [p.uid];
+            try { let u = JSON.parse(p.uidsJson || "[]"); if (Array.isArray(u)) list = list.concat(u); } catch (e) {}
+            uids = uids.concat(list);
+            if (newestOnly) break;
+        }
+        if (uids.length === 0) return false;
+        for (let i = 0; i < uids.length; i++) {
+            let n = root.liveNotifs[uids[i]];
+            if (n && typeof n.dismiss === "function") n.dismiss();
+            removePopup(uids[i]);
+        }
+        return true;
     }
 
     function dismissNotification(uid) {
@@ -358,16 +562,20 @@ Item {
             root.liveNotifs[currentUid] = n;
 
             if (n.closed) {
+                // Upstream removed the entry here; it stays in the history
+                // now (see "history" above), only its actions are gone.
                 n.closed.connect(() => {
                     if (root.liveNotifs[currentUid]) {
                         delete root.liveNotifs[currentUid];
                         for (let i = 0; i < historyModel.count; i++) {
                             let item = historyModel.get(i);
                             if (item && item.uid === currentUid) {
-                                historyModel.remove(i, 1);
+                                historyModel.setProperty(i, "actionsJson", "[]");
+                                historyModel.setProperty(i, "hasActions", false);
                                 break;
                             }
                         }
+                        if (!root._isBatchUpdating) root.rebuildGroups();
                     }
                 });
             }
@@ -379,6 +587,13 @@ Item {
             let bodyText = n.body !== "" ? n.body : "";
             let imageVal = (n.image ? n.image.toString() : "") || (n.imagePath ? n.imagePath.toString() : "") || (n.appIcon ? n.appIcon.toString() : "");
 
+            // What the icon slot needs to choose as Omarchy does (NotifIcons):
+            // the sender's raw image, its desktop-entry hint, the glyph hint.
+            let senderImage = n.image ? String(n.image) : "";
+            let desktopEntryHint = n.desktopEntry ? String(n.desktopEntry) : "";
+            let glyphHint = "";
+            try { glyphHint = n.hints && typeof n.hints["omarchy-glyph"] === "string" ? n.hints["omarchy-glyph"] : ""; } catch (e) {}
+
             let notifData = {
                 "appName":     n.appName !== "" ? n.appName : "System",
                 "summary":     summaryText,
@@ -386,16 +601,23 @@ Item {
                 "iconPath":    n.appIcon !== "" ? n.appIcon : "",
                 "image":       imageVal,
                 "imagePath":   imageVal,
+                "senderImage": senderImage,
+                "desktopEntry": desktopEntryHint,
+                "glyph":       glyphHint,
                 "actionsJson": JSON.stringify(extractedActions),
                 "hasActions":  hasAct,
                 "uid":         currentUid,
-                "notif":       n,
+                // No "notif" here: the live object is in liveNotifs, and rows
+                // restored from disk have none. Every row keeps the same roles,
+                // since a QObject role added to a ListModel that already holds
+                // rows crashes it (QQmlListModel::data).
                 "timestamp":   now,
                 "urgency":     n.urgency,
                 "read":        false
             };
 
             historyModel.insert(0, notifData);
+            if (historyModel.count > root.historyLimit) root.pruneHistory();
 
             if (!root.isStartup && !root.sysPanelOpen) {
                 let newPopup = {
@@ -408,6 +630,9 @@ Item {
                     "icon":          resolved.icon || notifData.iconPath,
                     "image":         imageVal,
                     "imagePath":     imageVal,
+                    "senderImage":   senderImage,
+                    "desktopEntry":  desktopEntryHint,
+                    "glyph":         glyphHint,
                     "summary":       summaryText,
                     "body":          bodyText,
                     "combinedBody":  bodyText,

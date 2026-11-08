@@ -4,6 +4,18 @@ What changed in each version of Meander, newest first. Versions are the ones in 
 
 Meander's version is the Serpantinum release it is built on plus a port revision: `2.4.2-1` is the first Meander release on Serpantinum 2.4.2, `2.4.2-2` a Meander-only change on the same base, and `2.4.3-1` the first release after merging Serpantinum 2.4.3. `upstream.json` holds the exact upstream commit; `meander upstream` shows how far behind Serpantinum's latest release and master it is.
 
+## 2.4.2-11 - 2026-11-08
+
+Upstream base: unchanged (Serpantinum v2.4.2 +10 commits, `246061b`).
+
+### Added
+- **notifications**: the sidebar keeps your notification history, as Omarchy does: a notification stays after its app withdraws it, it expires or its popup is closed, and the history survives a shell restart (`~/.local/state/meander/notifications/history.json`, the newest 100 from the last 24 hours, as Omarchy keeps them). Notifications Omarchy recorded before Meander took over show there too
+- **notifications**: the icon slot follows Omarchy's own notifications: the sender's picture (cropped, rounded), else the app's icon from the icon theme or its desktop entry (one-colour icons tinted with the text colour), else an `omarchy-glyph` hint, using Omarchy's own icon logic
+
+### Changed
+- **notifications**: Omarchy's `dismissOne` / `dismissAll` close popups into the history instead of erasing it; `clear` empties it
+- **theme**: Pure black keeps the theme's hue in its card and panel surfaces instead of flat greys, so popups and sidebar cards match the theme
+
 ## 2.4.2-10 - 2026-11-08
 
 Upstream base: unchanged (Serpantinum v2.4.2 +10 commits, `246061b`).

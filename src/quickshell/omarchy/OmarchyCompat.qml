@@ -139,14 +139,11 @@ Item {
             return compat.dndOn() ? "on" : "off";
         }
         function act(): string { return compat.invoke(compat.newest(), 0) ? "ok" : "none"; }
-        function dismissOne(): string {
-            let e = compat.newest();
-            if (!e) return "none";
-            NotificationManager.dismissNotification(e.uid);
-            NotificationManager.removePopup(e.uid);
-            return "ok";
-        }
-        function dismissAll(): string { NotificationManager.clearNotifications(); return "ok"; }
+        // As Omarchy's: the newest popup / every popup closes into the
+        // history, which only the panel's clear empties.
+        function dismissOne(): string { return NotificationManager.dismissPopups(true) ? "ok" : "none"; }
+        function dismissAll(): string { NotificationManager.dismissPopups(false); return "ok"; }
+        function clear(): string { NotificationManager.clearNotifications(); return "ok"; }
         function invokeLast(): string { return compat.invoke(compat.newest(), 0) ? "ok" : "none"; }
         function invokeAction(n: int): string { return compat.invoke(compat.newest(), n - 1) ? "ok" : "none"; }
         function keyboard(): string {
