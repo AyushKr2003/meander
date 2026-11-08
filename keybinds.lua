@@ -31,6 +31,11 @@ o.bind("SUPER + ALT + H", "Meander settings", "meander settings toggle")
 o.bind("SUPER + ALT + Z", "Meander bar autohide", "meander msg bar autohide")
 o.bind("SUPER + ALT + X", "Meander screenshot", "meander screenshot")
 o.bind("SUPER + ALT + T", "Meander desktop widgets", "meander redactor")
+-- The quick actions sidebar (the one on the screen edges), opened from the
+-- keyboard: Tab or Ctrl+Tab switches tabs, arrows (or h j k l) move a cursor
+-- over the page, Enter clicks, Escape shrinks then closes it. Add a tab name
+-- to open that one: draw, system, timer, notes, calculator.
+o.bind("SUPER + ALT + I", "Meander quick actions", "meander quick toggle")
 
 -- ── Keyboard navigation ─────────────────────────────────────────────────────
 -- The bar takes the keyboard (arrows move, Enter clicks, Ctrl+Tab goes to the

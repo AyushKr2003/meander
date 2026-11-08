@@ -18,7 +18,10 @@ Variants {
 
             WlrLayershell.namespace: "qs-floating-overlay"
             WlrLayershell.layer: WlrLayer.Overlay
-            WlrLayershell.keyboardFocus: shouldHaveKeyboardFocus ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+            // Meander: opened from the keyboard (keyOpened), it holds the
+            // keyboard (Exclusive, as the dock does) until Escape or close.
+            WlrLayershell.keyboardFocus: (keyOpened && isSidebarVisible) ? WlrKeyboardFocus.Exclusive
+                : (shouldHaveKeyboardFocus ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
             exclusionMode: ExclusionMode.Ignore
             color: "transparent"
             visible: surfaceNeeded
@@ -40,7 +43,58 @@ Variants {
                 interval: 2000
             }
 
-            readonly property bool shouldHaveKeyboardFocus: isSidebarVisible && (isExpanded || hasInputFocus)
+            readonly property bool shouldHaveKeyboardFocus: isSidebarVisible && (isExpanded || hasInputFocus || keyOpened)
+
+            // ---- Meander: keyboard-opened sidebar (`meander quick`, IPC
+            // meander.floating open/toggle/close). Upstream opens it only from
+            // the screen edges and hides it on a pointer timer; opened from a
+            // hotkey it stays until Escape (or toggle/close) instead.
+            property bool keyOpened: false
+
+            function tabIndexFor(tab) {
+                let t = String(tab || "").trim().toLowerCase();
+                if (t === "") return -1;
+                let n = parseInt(t);
+                if (!isNaN(n) && String(n) === t) return (n >= 0 && n < tabCount) ? n : -1;
+                if (t === "calc") t = "calculator";
+                if (t === "usage" || t === "sysmon" || t === "monitor") t = "system";
+                for (let i = 0; i < tabModules.length; i++) {
+                    let name = tabModules[i].replace(/^.*\//, "").replace(/\.qml$/, "").toLowerCase();
+                    if (name.indexOf(t) === 0) return i;
+                }
+                return -1;
+            }
+
+            function keyOpen(tab) {
+                let idx = tabIndexFor(tab);
+                if (idx >= 0) activeIndex = idx;
+                keyOpened = true;
+                useGraceTimer = false;
+                hideTimer.stop();
+                if (isSidebarVisible || isPinned) {
+                    isExpanded = true;
+                    grabKeyboardFocus();
+                    Qt.callLater(grabKeyboardFocus);
+                    return;
+                }
+                let sideEdge = (barPosition === "left") ? "right" : "left";
+                showSidebar(sideEdge, screenHeight / 2, true);
+            }
+
+            function keyClose() {
+                if (!keyOpened && !isSidebarVisible) return;
+                unfocusAllInputs();
+                keyOpened = false;
+                isExpanded = false;
+                if (!isPinned) isSidebarVisible = false;
+            }
+
+            function keyToggle(tab) {
+                let idx = tabIndexFor(tab);
+                let open = isSidebarVisible && isExpanded;
+                if (open && (idx < 0 || idx === activeIndex)) keyClose();
+                else keyOpen(tab);
+            }
 
             readonly property bool hasInputFocus: {
                 let loader = (typeof moduleRepeater !== "undefined" && activeIndex >= 0 && activeIndex < moduleRepeater.count)
@@ -110,6 +164,8 @@ Variants {
                     SysData.prewarm();
                     grabKeyboardFocus();
                     Qt.callLater(grabKeyboardFocus);
+                } else if (pendingMode !== "sidebar") {
+                    keyOpened = false; // Meander: closed, give the keyboard back
                 }
             }
 
@@ -401,8 +457,48 @@ Variants {
                             floatingWidget.cycleTab(-1);
                             event.accepted = true;
                         }
+                    } else {
+                        keyNav.handle(event); // Meander: the page's keyboard cursor
                     }
                 }
+                // Meander: key-up ends a press and hold (KeyNav.handleRelease).
+                Keys.onReleased: event => keyNav.handleRelease(event)
+                // Meander: the tabs' own Shortcuts (Calculator's Enter = equals,
+                // Timer's Enter = start) beat Keys handlers: while the cursor is
+                // shown its keys are claimed so they reach it. Typing anything
+                // else (a digit into the Calculator) leaves the cursor.
+                Keys.onShortcutOverride: event => {
+                    if (keyNav.claims(event)) {
+                        event.accepted = true;
+                    } else if (keyNav.keyMode && event.text.length > 0 && "hjkl".indexOf(event.text) < 0
+                               && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))) {
+                        keyNav.keyMode = false;
+                    }
+                }
+            }
+
+            // ---- Meander: keyboard cursor in the expanded page
+            // (keynav/KeyNav.qml). Upstream's sidebar is pointer-only inside a
+            // page; here arrows / h j k l move a ring over the page's controls,
+            // Enter or Space clicks, Ctrl+Tab switches tabs (Tab still does, as
+            // upstream). A page that uses the arrows itself (Timer while idle,
+            // childIntercepts) keeps them: h j k l move the cursor there.
+            readonly property Item activePage: {
+                void moduleRepeater.count;
+                let l = moduleRepeater.itemAt(activeIndex);
+                return (l && l.item) ? l.item : null;
+            }
+            readonly property bool pageNav: isSidebarVisible && isExpanded && activePage !== null
+
+            KeyNav {
+                id: keyNav
+                anchors.fill: parent
+                z: 1000
+                scope: floatingWidget.activePage
+                focusHome: focusTracker
+                active: floatingWidget.pageNav
+                vimKeysOnly: floatingWidget.childIntercepts("Up")
+                onCycleRequested: (d) => floatingWidget.cycleTab(d)
             }
 
             property bool isPinned: false
@@ -476,6 +572,21 @@ Variants {
                         floatingWidget.showNotes();
                     }
                 }
+
+                // Meander: keyboard open / toggle / close (one screen at a time)
+                function onKeyOpenRequested(screen, tab) {
+                    if (floatingWidget.matchesScreen(screen)) floatingWidget.keyOpen(tab);
+                    else floatingWidget.keyClose();
+                }
+
+                function onKeyToggleRequested(screen, tab) {
+                    if (floatingWidget.matchesScreen(screen)) floatingWidget.keyToggle(tab);
+                    else floatingWidget.keyClose();
+                }
+
+                function onKeyCloseRequested() {
+                    floatingWidget.keyClose();
+                }
             }
 
             function matchesScreen(targetScreen) {
@@ -533,6 +644,7 @@ Variants {
             }
 
             function kickTimer() {
+                if (keyOpened) return; // Meander: stays until Escape
                 if (!isPinned && !floatingWidget.hasInputFocus) {
                     if ((typeof mainHoverTracker !== "undefined" && mainHoverTracker.hovered) ||
                         (typeof sidebarDragArea !== "undefined" && (sidebarDragArea.containsMouse || sidebarDragArea.pressed)) ||
@@ -559,7 +671,7 @@ Variants {
             Shortcut { enabled: floatingWidget.isSidebarVisible && !floatingWidget.hasInputFocus && !floatingWidget.childIntercepts("Enter"); sequence: "Enter"; onActivated: { floatingWidget.isExpanded = !floatingWidget.isExpanded; floatingWidget.kickTimer(); } }
 
             Shortcut {
-                enabled: floatingWidget.isSidebarVisible && !floatingWidget.hasInputFocus && (floatingWidget.activeEdge === "bottom" || floatingWidget.activeEdge === "top") && !floatingWidget.childIntercepts("Left")
+                enabled: floatingWidget.isSidebarVisible && !floatingWidget.hasInputFocus && (floatingWidget.activeEdge === "bottom" || floatingWidget.activeEdge === "top") && !floatingWidget.childIntercepts("Left") && !floatingWidget.pageNav // Meander: arrows are the page cursor's
                 sequence: "Left"
                 onActivated: {
                     let step = floatingWidget.activeEdge === "top" ? 1 : -1;
@@ -568,7 +680,7 @@ Variants {
                 }
             }
             Shortcut {
-                enabled: floatingWidget.isSidebarVisible && !floatingWidget.hasInputFocus && (floatingWidget.activeEdge === "bottom" || floatingWidget.activeEdge === "top") && !floatingWidget.childIntercepts("Right")
+                enabled: floatingWidget.isSidebarVisible && !floatingWidget.hasInputFocus && (floatingWidget.activeEdge === "bottom" || floatingWidget.activeEdge === "top") && !floatingWidget.childIntercepts("Right") && !floatingWidget.pageNav // Meander: arrows are the page cursor's
                 sequence: "Right"
                 onActivated: {
                     let step = floatingWidget.activeEdge === "top" ? -1 : 1;
@@ -577,7 +689,7 @@ Variants {
                 }
             }
             Shortcut {
-                enabled: floatingWidget.isSidebarVisible && !floatingWidget.hasInputFocus && (floatingWidget.activeEdge === "left" || floatingWidget.activeEdge === "right") && !floatingWidget.childIntercepts("Up")
+                enabled: floatingWidget.isSidebarVisible && !floatingWidget.hasInputFocus && (floatingWidget.activeEdge === "left" || floatingWidget.activeEdge === "right") && !floatingWidget.childIntercepts("Up") && !floatingWidget.pageNav // Meander: arrows are the page cursor's
                 sequence: "Up"
                 onActivated: {
                     let step = floatingWidget.activeEdge === "right" ? 1 : -1;
@@ -586,7 +698,7 @@ Variants {
                 }
             }
             Shortcut {
-                enabled: floatingWidget.isSidebarVisible && !floatingWidget.hasInputFocus && (floatingWidget.activeEdge === "left" || floatingWidget.activeEdge === "right") && !floatingWidget.childIntercepts("Down")
+                enabled: floatingWidget.isSidebarVisible && !floatingWidget.hasInputFocus && (floatingWidget.activeEdge === "left" || floatingWidget.activeEdge === "right") && !floatingWidget.childIntercepts("Down") && !floatingWidget.pageNav // Meander: arrows are the page cursor's
                 sequence: "Down"
                 onActivated: {
                     let step = floatingWidget.activeEdge === "right" ? -1 : 1;
@@ -606,6 +718,8 @@ Variants {
                     if (floatingWidget.isExpanded) {
                         floatingWidget.isExpanded = false;
                         floatingWidget.kickTimer();
+                    } else if (floatingWidget.keyOpened) {
+                        floatingWidget.keyClose(); // Meander: no peek left behind
                     } else if (!floatingWidget.isPinned) {
                         floatingWidget.isSidebarVisible = false;
                         floatingWidget.isPeekVisible = true;
@@ -637,9 +751,11 @@ Variants {
             property int activeIndex: 0
             onActiveIndexChanged: {
                 unfocusAllInputs();
+                keyNav.reset(keyNav.keyMode && pageNav); // Meander: cursor to the new page
             }
             property bool isExpanded: false
             onIsExpandedChanged: {
+                if (!isExpanded) keyNav.reset(false); // Meander
                 if (isExpanded) {
                     grabKeyboardFocus();
                     Qt.callLater(grabKeyboardFocus);
@@ -1060,7 +1176,7 @@ Variants {
                 id: hideTimer
                 interval: floatingWidget.useGraceTimer ? 3000 : 800
                 onTriggered: {
-                    if (floatingWidget.isPinned || floatingWidget.hasInputFocus) return;
+                    if (floatingWidget.isPinned || floatingWidget.hasInputFocus || floatingWidget.keyOpened) return;
 
                     if ((typeof sidebarDragArea !== "undefined" && sidebarDragArea.pressed) ||
                         (typeof peekMouse !== "undefined" && peekMouse.pressed) ||
@@ -1470,6 +1586,12 @@ Variants {
 
                     Item {
                         id: expandedContainer
+                        // Meander: keys a focused page control left alone (a
+                        // dropdown's arrows) climb to here, not to the
+                        // focusTracker beside the pages: hand them to the cursor.
+                        Keys.onPressed: event => keyNav.handle(event)
+                        Keys.onReleased: event => keyNav.handleRelease(event)
+                        Keys.onShortcutOverride: event => { if (keyNav.claims(event)) event.accepted = true; }
                         x: floatingWidget.sidebarW
                         y: 0
                         height: parent.height

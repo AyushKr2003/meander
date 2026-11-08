@@ -4,6 +4,17 @@ What changed in each version of Meander, newest first. Versions are the ones in 
 
 Meander's version is the Serpantinum release it is built on plus a port revision: `2.4.2-1` is the first Meander release on Serpantinum 2.4.2, `2.4.2-2` a Meander-only change on the same base, and `2.4.3-1` the first release after merging Serpantinum 2.4.3. `upstream.json` holds the exact upstream commit; `meander upstream` shows how far behind Serpantinum's latest release and master it is.
 
+## 2.4.2-13 - 2026-11-08
+
+Upstream base: unchanged (Serpantinum v2.4.2 +10 commits, `246061b`).
+
+### Added
+- **quick actions**: the edge sidebar opens from the keyboard: `meander quick toggle [tab]`, `meander quick open [tab]`, `meander quick close` (IPC `meander.floating open/toggle/close`; tab is draw, system, timer, notes or calculator). It opens expanded on the focused monitor and keeps the keyboard until Escape, instead of hiding when the pointer is away; `keybinds.lua` binds SUPER + ALT + I
+- **keyboard navigation**: the expanded quick actions page has the focus ring: arrows or h j k l move it over the page's controls, Enter or Space clicks, Ctrl+Tab switches tabs (Tab still does), typing anything else hides it. The Timer keeps its arrows for setting the time while idle; h j k l move the ring there
+
+### Changed
+- **quick actions**: while expanded, the arrows move the focus ring instead of stepping through tabs; in the small sidebar they still step tabs
+
 ## 2.4.2-12 - 2026-11-08
 
 Upstream base: unchanged (Serpantinum v2.4.2 +10 commits, `246061b`).
