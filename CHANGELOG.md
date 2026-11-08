@@ -4,6 +4,16 @@ What changed in each version of Meander, newest first. Versions are the ones in 
 
 Meander's version is the Serpantinum release it is built on plus a port revision: `2.4.2-1` is the first Meander release on Serpantinum 2.4.2, `2.4.2-2` a Meander-only change on the same base, and `2.4.3-1` the first release after merging Serpantinum 2.4.3. `upstream.json` holds the exact upstream commit; `meander upstream` shows how far behind Serpantinum's latest release and master it is.
 
+## 2.4.2-6 - 2026-11-08
+
+Upstream base: unchanged (Serpantinum v2.4.2 +10 commits, `246061b`).
+
+### Changed
+- **background**: Omarchy's own background draws the desktop again; `meander enable` no longer takes it over and gives back an earlier handover. The wallpaper picker applies through `omarchy-theme-bg-set` (one image on every monitor, Omarchy's transition), and the lock screen, blur and previews follow Omarchy's current background
+
+### Fixed
+- **engines**: Meander took over every desktop engine once the shell finished loading, whatever `shell.json` said (Omarchy's plugin registry only answers for Meander itself); ownership now follows `shell.json`
+
 ## 2.4.2-5 - 2026-11-08
 
 Upstream base: unchanged (Serpantinum v2.4.2 +10 commits, `246061b`).

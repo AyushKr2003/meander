@@ -70,8 +70,12 @@ QtObject {
         return !!(c.bar && c.bar.id === "meander.bar" && off.indexOf(id) >= 0);
     }
 
+    // shell.json decides, always: the registry Omarchy injects into a plugin
+    // (PluginRegistryApi) answers isEnabled() only for the plugin itself, so on
+    // its own it reads every engine as off and Meander would take them all.
+    // Where the registry does know (a live clone), it can still veto.
     function owns(id) {
-        return root.hosted ? !root.omarchyEnabled(id) : root.fileOwns(id);
+        return root.fileOwns(id) && !(root.hosted && root.omarchyEnabled(id));
     }
     readonly property bool ownsNotifications: owns("omarchy.notifications")
     readonly property bool ownsPolkit: owns("omarchy.polkit")

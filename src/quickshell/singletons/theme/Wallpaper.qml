@@ -86,6 +86,15 @@ Item {
     }
 
     function setWallpaper(screenName: string, path: string, transition: string): void {
+        // Meander: Omarchy's background plugin draws the desktop unless Meander
+        // owns that engine. Hand the pick to Omarchy then (one image on every
+        // monitor, Omarchy's transition); OmarchyCompat mirrors it back here.
+        if (!OmarchyHost.ownsBackground) {
+            let p = String(path || "").replace(/^file:\/\//, "").trim();
+            if (p !== "" && p !== root.getWallpaperPath(""))
+                Quickshell.execDetached(["omarchy-theme-bg-set", p]);
+            return;
+        }
         root.wallpaperChanged(screenName, path, transition ? transition : "fade");
     }
 

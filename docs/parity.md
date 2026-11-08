@@ -26,7 +26,7 @@ Meander 2.4.2-2 against Serpantinum 2.4.2 (+10 commits, `246061b`), module by mo
 | Idle (`idle/`) | Same, opt-in | Omarchy's idle service is in charge by default (upstream defaulted to on) |
 | Dock + app picker + menus | Same, handed over | Default apps: your Omarchy terminal, browser, file manager |
 | Desktop widgets + widget editor (clock, weather, music, usage, notes, GitHub, image, text, user, battery, visualiser) | Same | |
-| Wallpaper engine (images, video, transitions) + picker (local, favourites, history, colour filter, web search) | Same, Omarchy-fed | Follows Omarchy's background; picker folder is the current theme's backgrounds |
+| Wallpaper engine (images, video, transitions) + picker (local, favourites, history, colour filter, web search) | Omarchy-backed | Omarchy's background plugin draws the desktop (Meander's engine runs only if `omarchy.background` is handed over by hand); the picker applies with `omarchy-theme-bg-set` (all monitors, Omarchy's transition, so per-monitor picks and Meander's transition styles don't apply); Meander mirrors the current image for lock screen, blur and previews; picker folder is the current theme's backgrounds |
 | Screenshot / recording overlay (region, window, screen, edit, OCR, QR, audio) | Same | |
 | Floating quick actions (calculator, notes, timer, draw, system usage, dock) | Same | |
 | Digital wellbeing (day/week/month, heatmap, limits, overlay) | Shim | `meander-core screentime` (SQLite, Hyprland events) |

@@ -25,7 +25,7 @@ Item {
     property var shell: null
     property var manifest: null
 
-    readonly property string version: manifest && manifest.version ? manifest.version : "2.4.2-5"
+    readonly property string version: manifest && manifest.version ? manifest.version : "2.4.2-6"
 
     // Created first thing, so the notification server (when Meander owns it,
     // see OmarchyHost.fileOwns) is on the bus before the rest of the bar has

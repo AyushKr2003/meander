@@ -243,6 +243,75 @@ Item {
         }
     }
 
+    // Omarchy draws the desktop (the default): no wallpaper engine of ours.
+    // Mirror Omarchy's current background into the files and state the engine
+    // would have written (snapshots for lock screen, blur and previews, the
+    // per-monitor restore files, history), so everything that reads them keeps
+    // working and an engine started later resumes from the same image.
+    property bool mirrorForce: true
+
+    Process {
+        id: mirrorProc
+        command: ["bash", "-c",
+            "link=\"$1\"; cache=\"$2\"; force=\"$3\"; shift 3\n" +
+            "p=$(readlink -f \"$link\" 2>/dev/null); [ -n \"$p\" ] && [ -f \"$p\" ] || exit 0\n" +
+            "if [ \"$force\" = 1 ] || [ \"$(cat \"$cache/omarchy_mirror\" 2>/dev/null)\" != \"$p\" ]; then\n" +
+            "  mkdir -p \"$cache\"; snap=\"$cache/current_wallpaper.png\"; tmp=\"$snap.tmp.$$\"\n" +
+            "  case \"${p,,}\" in\n" +
+            "    *.mp4|*.mkv|*.mov|*.webm) ffmpeg -y -hide_banner -loglevel error -ss 00:00:01 -i \"$p\" -frames:v 1 -c:v png -f image2 \"$tmp\" 2>/dev/null || ffmpeg -y -hide_banner -loglevel error -i \"$p\" -frames:v 1 -c:v png -f image2 \"$tmp\" 2>/dev/null ;;\n" +
+            "    *) cp -f \"$p\" \"$tmp\" ;;\n" +
+            "  esac\n" +
+            "  [ -s \"$tmp\" ] && mv -f \"$tmp\" \"$snap\" || rm -f \"$tmp\"\n" +
+            "  for s in \"$@\"; do\n" +
+            "    cp -f \"$snap\" \"$cache/current_wallpaper_$s.png.tmp\" && mv -f \"$cache/current_wallpaper_$s.png.tmp\" \"$cache/current_wallpaper_$s.png\"\n" +
+            "    printf '%s' \"$p\" > \"$cache/current_$s\"; printf '%s' \"${p##*/}\" > \"$cache/current_${s}_name\"\n" +
+            "  done\n" +
+            "  h=\"$cache/history.txt\"; n=\"${p##*/}\"\n" +
+            "  { printf '%s\\n' \"$n\"; grep -v -F -x -- \"$n\" \"$h\" 2>/dev/null; } > \"$h.tmp\" && mv -f \"$h.tmp\" \"$h\"\n" +
+            "  printf '%s' \"$p\" > \"$cache/omarchy_mirror\"; echo changed\n" +
+            "fi\n" +
+            "echo \"$p\"",
+            "_", OmarchyHost.currentBackground, Caching.getCacheDir("wallpaper"), compat.mirrorForce ? "1" : "0"
+        ].concat(Quickshell.screens.map(s => s.name))
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let lines = this.text.trim().split("\n");
+                let p = lines[lines.length - 1].trim();
+                if (p === "") return;
+                let changed = lines.indexOf("changed") >= 0;
+                let first = compat.mirrorForce;
+                compat.mirrorForce = false;
+                let names = Quickshell.screens.map(s => s.name);
+                if (!changed && names.every(n => Wallpaper.screenWallpaperPaths[n] === p)) return;
+                let paths = Object.assign({}, Wallpaper.screenWallpaperPaths);
+                let files = Object.assign({}, Wallpaper.screenWallpapers);
+                for (let i = 0; i < names.length; i++) {
+                    paths[names[i]] = p;
+                    files[names[i]] = p.substring(p.lastIndexOf("/") + 1);
+                }
+                Wallpaper.screenWallpaperPaths = paths;
+                Wallpaper.screenWallpapers = files;
+                // Same colour hook the engine runs on a new wallpaper (only does
+                // anything with the Matugen preset); not on start-up.
+                if (changed && !first && typeof Matugen !== "undefined" && typeof Matugen.generate === "function") {
+                    let video = /\.(mp4|mkv|mov|webm)$/i.test(p);
+                    Matugen.generate(video ? Caching.getCacheDir("wallpaper") + "/current_wallpaper.png" : p);
+                }
+            }
+        }
+    }
+
+    // Omarchy changes the background through its own plugin, which Meander
+    // can't hear; the link is cheap to read.
+    Timer {
+        interval: 2000
+        repeat: true
+        triggeredOnStart: true
+        running: !OmarchyHost.ownsBackground
+        onRunningChanged: if (running) compat.mirrorForce = true
+        onTriggered: if (!mirrorProc.running) mirrorProc.running = true
+    }
+
     Commons.ShellIpc {
         target: OmarchyHost.ownsDock ? "omarchy.dock" : ""
         function refresh(): void {}

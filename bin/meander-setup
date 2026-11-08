@@ -5,7 +5,7 @@
 #                                  plugin, its commands and default settings
 #   enable                         make Meander the Omarchy bar and hand it the
 #                                  desktop engines (notifications, polkit, lock,
-#                                  OSD, dock, background)
+#                                  OSD, dock); the background stays Omarchy's
 #   disable                        give everything back to Omarchy, exactly as it was
 #   switch [omarchy|meander]       toggle between the two (or pick one)
 #   status                         what runs now
@@ -36,7 +36,10 @@ BIN_DIR="$HOME/.local/bin"
 COMMANDS=(meander meander-core meander-gamma meander-audio meander-setup)
 
 # The Omarchy plugins whose job Meander takes over while it is the bar.
-ENGINES=(omarchy.notifications omarchy.polkit omarchy.lock omarchy.osd omarchy.dock omarchy.background)
+ENGINES=(omarchy.notifications omarchy.polkit omarchy.lock omarchy.osd omarchy.dock)
+# Engines an earlier Meander took over and no longer does: Omarchy draws the
+# desktop background (Meander mirrors it). Enable gives these back.
+RETIRED=(omarchy.background)
 
 # Runtime packages beyond a stock Omarchy (all in Arch's repos).
 DEPS=(matugen pavucontrol satty wf-recorder playerctl swh-plugins qt6-multimedia qt6-imageformats
@@ -172,6 +175,20 @@ engine_ids() {
     printf '%s\n' "${ids[@]}"
 }
 
+give_back_retired() {
+    # Only what this setup recorded taking: a retired engine or a clone of one.
+    local retired back
+    retired=$(printf '%s\n' "${RETIRED[@]}" | jq -R . | jq -s .)
+    retired=$(omarchy plugin list --json 2>/dev/null | jq -c --argjson r "$retired" \
+        '$r + [.[] | select((.clonedFrom // "") as $c | $r | index($c)) | .id]' 2>/dev/null) || true
+    [[ -n $retired ]] || retired=$(printf '%s\n' "${RETIRED[@]}" | jq -R . | jq -s -c .)
+    back=$(jq -c --argjson r "$retired" '[(.addedDisabled // [])[] | select(. as $i | $r | index($i))]' "$RECORD" 2>/dev/null)
+    [[ -n $back && $back != "[]" ]] || return 0
+    shell_json_edit --argjson b "$back" '.disabledPlugins = ((.disabledPlugins // []) - $b)'
+    record_set --argjson b "$back" '.addedDisabled = ((.addedDisabled // []) - $b)'
+    c_ok "given back to Omarchy: $(jq -r 'join(", ")' <<<"$back")"
+}
+
 do_enable() {
     require_omarchy
     [[ -e $PLUGIN_DIR/manifest.json ]] || die "Meander is not installed; run ./install.sh first"
@@ -180,6 +197,7 @@ do_enable() {
     if [[ $current != "$PLUGIN_ID" ]]; then
         record_set --arg b "$current" '.previousBar = $b'
     fi
+    give_back_retired
     ids=$(engine_ids | jq -R . | jq -s 'unique')
     added=$(jq -c --argjson ids "$ids" '($ids - (.disabledPlugins // []))' "$SHELL_JSON")
     # Merge with what an earlier enable already recorded, so a second enable
