@@ -470,29 +470,128 @@ Item {
     // ------------------------------------------------------------- the ring
     //
     // Meander's focus indicator: a 2px accent outline 2px outside the
-    // control, following its corner radius; just inside the edge instead
-    // where a clipping ancestor (a scroll view, a clipped card, the popout's
-    // own edge) would cut the outer one off. It glides between stops.
+    // control, following its corners (each one, so a segment of a switch
+    // or a tab with only its outer corners rounded gets the same shape);
+    // just inside the edge instead where a clipping ancestor (a scroll view,
+    // a clipped card, the popout's own edge) or the edge of the background
+    // it sits on (a bar module's pill) would cut across the outer one.
+    // On a control with a coloured fill (an accent bar pill, a selected
+    // segment, a filled button) it sits inside the fill instead, in the control's own
+    // icon/text colour, which reads on any fill, the accent included. It
+    // glides between stops.
 
-    function radiusOf(t) {
+    function isRect(it) { return it && it.border !== undefined && typeof it.radius === "number" && it.color !== undefined }
+    // What an item paints its area with: a Rectangle's colour, or a level
+    // fill (FluidWave: the battery pill's charge) once it covers most of it.
+    function paintOf(it) {
+        if (isRect(it)) return it.color
+        if (it && typeof it.fillLevel === "number" && it.fillLevel >= 0.5 && it.color2 !== undefined) return it.color2
+        return null
+    }
+    function isText(it) { return it && typeof it.text === "string" && it.font !== undefined && it.color !== undefined && it.horizontalAlignment !== undefined }
+
+    // A neutral surface: the theme's background and surface steps (a bar
+    // module's pill, a plain button), where the accent ring already reads.
+    function isNeutral(c) {
+        const near = (a, b) => Math.abs(a.r - b.r) + Math.abs(a.g - b.g) + Math.abs(a.b - b.b) < 0.09
+        const T = ThemeBackend
+        const steps = [T.crust, T.mantle, T.base, T.surface0, T.surface1, T.surface2, "#000000"]
+        for (let i = 0; i < steps.length; i++) if (near(c, Qt.color(steps[i]))) return true
+        return Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b) < 0.06 && 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b < 0.35
+    }
+
+    // The coloured fill drawn behind the control: the control itself, or a
+    // Rectangle beside or above it that covers its centre and isn't much
+    // bigger (a bar pill, the selected segment's highlight, the battery's
+    // charge; not the card or
+    // panel it sits on). null when the control sits on a neutral surface.
+    function fillOf(t) {
+        const r = rectOf(t)
+        const cx = r.x + r.w / 2, cy = r.y + r.h / 2, area = Math.max(1, r.w * r.h)
+        const solid = c => {
+            const col = c === ring ? null : paintOf(c)
+            if (!col || !c.visible || c.opacity * col.a < 0.5 || isNeutral(col)) return false
+            const q = rectOf(c)
+            return q.w * q.h <= area * 2.5 && cx >= q.x && cx <= q.x + q.w && cy >= q.y && cy <= q.y + q.h
+        }
+        if (solid(t)) return t
+        for (let p = t, d = 0; p && d < 6; p = p.parent, d++) {
+            const kids = p.children
+            for (let i = kids.length - 1; i >= 0; i--) if (kids[i] !== t && solid(kids[i])) return kids[i]
+            if (p !== t && solid(p)) return p
+            if (p === scope) break
+        }
+        return null
+    }
+
+    // The colour the control draws its icon and label in: the first label
+    // inside its button (its largest same-size ancestor), else whichever of
+    // the theme's text and crust stands out on the fill.
+    function foregroundOf(t, fillItem) {
+        const fill = { color: paintOf(fillItem) }
         const near = (a, b) => Math.abs(a.width - b.width) < 2 && Math.abs(a.height - b.height) < 2
-        const own = r => (typeof r.cornerRadius === "number" && r.cornerRadius > 0) ? r.cornerRadius
-            : (typeof r.radius === "number" && r.radius > 0 && r.border !== undefined) ? r.radius : -1
+        let button = t
+        for (let p = t.parent, d = 0; p && d < 3 && near(p, t); p = p.parent, d++) button = p
+        const lum = c => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
+        const find = (it, d) => {
+            if (!it || !it.visible || it.opacity < 0.3 || d > 4) return null
+            if (isText(it) && it.text !== "" && Math.abs(lum(it.color) - lum(fill.color)) > 0.25) return it.color
+            for (let i = 0; i < it.children.length; i++) {
+                const c = find(it.children[i], d + 1)
+                if (c) return c
+            }
+            return null
+        }
+        return find(button, 0) || find(fillItem, 0)
+            || (lum(fill.color) > 0.5 ? ThemeBackend.crust : ThemeBackend.text)
+    }
+
+    // The background the control sits on: the nearest Rectangle around it
+    // that is bigger than it (a bar module's pill, a card). The outer ring
+    // has to fit inside it, or it would cut across that edge.
+    function surfaceOf(t) {
+        const r = rectOf(t)
+        const holds = c => {
+            if (!isRect(c) || c === ring || !c.visible || c.opacity * c.color.a < 0.3) return false
+            const q = rectOf(c)
+            return q.w * q.h > r.w * r.h * 1.3 && Logic.contains(q, r)
+        }
+        for (let p = t.parent, d = 0; p && d < 8; p = p.parent, d++) {
+            const kids = p.children
+            for (let i = kids.length - 1; i >= 0; i--) if (holds(kids[i])) return kids[i]
+            if (holds(p)) return p
+            if (p === scope) break
+        }
+        return null
+    }
+
+    // The control's corner radii, { tl, tr, bl, br }.
+    function cornersOf(t) {
+        const near = (a, b) => Math.abs(a.width - b.width) < 2 && Math.abs(a.height - b.height) < 2
+        const all = v => ({ tl: v, tr: v, bl: v, br: v })
+        const own = r => {
+            if (typeof r.cornerRadius === "number" && r.cornerRadius > 0) return all(r.cornerRadius)
+            if (r.border === undefined || typeof r.radius !== "number") return null
+            // A Rectangle: per-corner radii fall back to `radius` when unset.
+            const c = k => (typeof r[k] === "number" && r[k] >= 0) ? r[k] : r.radius
+            const cs = { tl: c("topLeftRadius"), tr: c("topRightRadius"), bl: c("bottomLeftRadius"), br: c("bottomRightRadius") }
+            return (cs.tl > 0 || cs.tr > 0 || cs.bl > 0 || cs.br > 0) ? cs : null
+        }
         let r = own(t)
-        if (r >= 0) return r
+        if (r) return r
         // A MouseArea filling its button: the button's corners, or those of
         // a background drawn beside it at the same size.
         const kids = t.children
-        for (let i = 0; i < kids.length; i++) if (near(kids[i], t) && (r = own(kids[i])) >= 0) return r
+        for (let i = 0; i < kids.length; i++) if (near(kids[i], t) && (r = own(kids[i]))) return r
         for (let p = t.parent, d = 0; p && d < 3; p = p.parent, d++) {
             if (!near(p, t)) break
-            if ((r = own(p)) >= 0) return r
+            if ((r = own(p))) return r
             for (let i = 0; i < p.children.length; i++) {
                 const s = p.children[i]
-                if (s !== t && near(s, t) && (r = own(s)) >= 0) return r
+                if (s !== t && near(s, t) && (r = own(s))) return r
             }
         }
-        return Math.min(t.height / 2, ThemeBackend.borderRadius)
+        return all(Math.min(t.height / 2, ThemeBackend.borderRadius))
     }
 
     Item {
@@ -500,10 +599,16 @@ Item {
         z: 1000
         property var rect: ({ x: 0, y: 0, w: 0, h: 0 })
         property bool inner: false
-        property real radius: 0
+        property real tl: 0
+        property real tr: 0
+        property real bl: 0
+        property real br: 0
         property bool gliding: false
         readonly property real gap: 2
         readonly property real thickness: 2
+        property color color: ThemeBackend.primary
+        property Item surfaceFor: null
+        property Item surface: null
 
         function glide() { gliding = true; glideEnd.restart(); update() }
         Timer { id: glideEnd; interval: 200; onTriggered: ring.gliding = false }
@@ -522,12 +627,22 @@ Item {
             if (!root.cursorAlive()) { rect = { x: 0, y: 0, w: 0, h: 0 }; restoreLater.restart(); return }
             const r = root.rectOf(t)
             const out = gap + thickness
-            inner = !Logic.contains(clipOf(t), Logic.grow(r, out))
-            const g = inner ? Logic.grow(r, -1) : Logic.grow(r, out)
+            const fill = root.fillOf(t)
+            const fg = fill ? root.foregroundOf(t, fill) : ThemeBackend.primary
+            if (!Qt.colorEqual(fg, color)) color = fg
+            if (surfaceFor !== t) { surfaceFor = t; surface = root.surfaceOf(t) }
+            let room = clipOf(t)
+            if (surface && surface.visible) room = Logic.intersect(room, root.rectOf(surface))
+            inner = !!fill || !Logic.contains(room, Logic.grow(r, out))
+            const ins = fill ? gap : 1
+            const g = inner ? Logic.grow(r, -ins) : Logic.grow(r, out)
             if (g.x !== rect.x || g.y !== rect.y || g.w !== rect.w || g.h !== rect.h) rect = g
-            // Corners scale with the control (rectOf is its drawn size).
-            const tr = root.radiusOf(t) * (t.width > 0 ? r.w / t.width : 1)
-            radius = Math.max(0, Math.min(g.h / 2, g.w / 2, inner ? tr - 1 : (tr > 0 ? tr + out : 0)))
+            // Corners scale with the control (rectOf is its drawn size); a
+            // square corner stays square.
+            const k = t.width > 0 ? r.w / t.width : 1
+            const cs = root.cornersOf(t)
+            const fit = v => Math.max(0, Math.min(g.h / 2, g.w / 2, inner ? v * k - ins : (v > 0 ? v * k + out : 0)))
+            tl = fit(cs.tl); tr = fit(cs.tr); bl = fit(cs.bl); br = fit(cs.br)
         }
         Timer { id: restoreLater; interval: 30; onTriggered: root.restore() }
 
@@ -551,10 +666,13 @@ Item {
 
         Rectangle {
             anchors.fill: parent
-            radius: ring.radius
+            topLeftRadius: ring.tl
+            topRightRadius: ring.tr
+            bottomLeftRadius: ring.bl
+            bottomRightRadius: ring.br
             color: "transparent"
             border.width: ring.thickness
-            border.color: ThemeBackend.primary
+            border.color: ring.color
             antialiasing: true
         }
     }

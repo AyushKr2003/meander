@@ -6,7 +6,7 @@ import time
 import urllib.request
 
 REPO = "AyushKr2003/meander"
-DEFAULT_VER = "2.4.2-9"
+DEFAULT_VER = "2.4.2-10"
 
 state_dir = os.path.expanduser("~/.local/state/meander")
 if "--state-dir" in sys.argv:

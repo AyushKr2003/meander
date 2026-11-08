@@ -154,6 +154,46 @@ BarFaceBase {
         function barSizeFor(screenName) { return root.stripSize; }
     }
 
+    // ------------------------------------------------- inert widgets
+    // Omarchy gives a replacement bar a service-less facade (shell.qml
+    // pluginShellForBarEntry), so a widget whose button needs its plugin's
+    // service (Daymark) disables itself here: no click, no keyboard stop.
+    // Its panel is still the plugin's own and the facade may toggle it, so
+    // while nothing in the widget takes clicks, the face does that itself,
+    // for the pointer and for keyboard navigation.
+    property bool widgetInert: false
+    function liveControlIn(it, d) {
+        if (!it || !it.visible || it.enabled === false || d > 12) return false;
+        const mouse = it.pressAndHoldInterval !== undefined && it.acceptedButtons !== undefined;
+        if (mouse && it.cursorShape === Qt.PointingHandCursor) return true;
+        if (it.activeFocusOnTab === true) return true;
+        for (let i = 0; i < it.children.length; i++) if (liveControlIn(it.children[i], d + 1)) return true;
+        return false;
+    }
+    Timer {
+        interval: 1000
+        repeat: true
+        triggeredOnStart: true
+        running: root.widgetShown && root.entryShell !== null
+        onRunningChanged: if (!running) root.widgetInert = false
+        onTriggered: {
+            const inert = !root.liveControlIn(root.widgetItem, 0);
+            if (inert !== root.widgetInert) root.widgetInert = inert;
+        }
+    }
+    MouseArea {
+        id: panelToggle
+        anchors.fill: parent
+        enabled: root.widgetInert && root.widgetShown && root.entryShell !== null
+        visible: enabled
+        cursorShape: Qt.PointingHandCursor
+        onClicked: {
+            let ok = false;
+            try { ok = root.entryShell.toggle(root.pluginId, ""); } catch (e) { console.warn("meander: " + root.pluginId + " panel toggle: " + e); }
+            if (!ok) console.warn("meander: " + root.pluginId + " has no panel the bar may toggle");
+        }
+    }
+
     // ------------------------------------------------- the widget
     Item {
         id: stage

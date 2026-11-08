@@ -4,6 +4,17 @@ What changed in each version of Meander, newest first. Versions are the ones in 
 
 Meander's version is the Serpantinum release it is built on plus a port revision: `2.4.2-1` is the first Meander release on Serpantinum 2.4.2, `2.4.2-2` a Meander-only change on the same base, and `2.4.3-1` the first release after merging Serpantinum 2.4.3. `upstream.json` holds the exact upstream commit; `meander upstream` shows how far behind Serpantinum's latest release and master it is.
 
+## 2.4.2-10 - 2026-11-08
+
+Upstream base: unchanged (Serpantinum v2.4.2 +10 commits, `246061b`).
+
+### Changed
+- **keyboard navigation**: the focus ring follows each corner of the control (a switch segment rounded only on its outer side gets that shape), and on a coloured fill (accent bar pills, the selected segment, the charged battery pill) it sits inside in the control's own icon colour instead of the accent
+
+### Fixed
+- **keyboard navigation**: the ring no longer spills over the edge of the pill a control sits in (the media module); it moves inside the control when the outer ring would not fit
+- **bar**: a third-party widget left without its plugin service (Daymark) opens its plugin's panel when clicked or activated from the keyboard, and keyboard navigation stops on it instead of skipping from the tray to the network
+
 ## 2.4.2-9 - 2026-11-08
 
 Upstream base: unchanged (Serpantinum v2.4.2 +10 commits, `246061b`).
