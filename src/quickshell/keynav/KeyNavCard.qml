@@ -47,6 +47,7 @@ Item {
             idle.restart();
             nav.handle(event);
         }
+        Keys.onReleased: (event) => nav.handleRelease(event)
     }
 
     KeyNav {

@@ -428,6 +428,7 @@ DockWindowApps {
             dockKeysIdle.restart();
             dockNav.handle(event);
         }
+        Keys.onReleased: (event) => dockNav.handleRelease(event)
     }
     KeyNav {
         id: dockNav

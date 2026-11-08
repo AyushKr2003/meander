@@ -39,6 +39,14 @@ import "KeyNavLogic.js" as Logic
 // (the whole subtree), and `keyNavActivate()` replaces the synthetic click.
 // `keyNavRingItem: someItem` draws the ring around that item instead.
 //
+// Press and hold: Enter / Space held on a hold control does what holding the
+// mouse button does. An item with keyNavHoldStart() / keyNavHoldEnd() gets
+// them on key down / key up (FillButton charges while held). A MouseArea
+// with `property bool keyNavHold: true` (its onPressAndHold does something)
+// gets pressAndHold(null) once the key is held for its pressAndHoldInterval;
+// let go sooner and it is a click, as with the mouse. Key-up comes from the
+// owner's Keys.onReleased calling handleRelease(event).
+//
 // The owner sizes this item over the surface, sets `scope`, and calls
 // handle(event) from a Keys.onPressed above the scope: keys a focused child
 // accepts (a text field's letters, a slider's arrows) never reach it.
@@ -279,6 +287,65 @@ Item {
         return null
     }
 
+    // ------------------------------------------------------- press and hold
+
+    // The key being held on a hold control: { key, t, own, ma, mods, fired }.
+    property var hold: null
+
+    function holdTargetOf(t) {
+        const own = nearest(t, "keyNavHoldStart")
+        if (own) return { own: own, ma: null }
+        const ma = isMouseArea(t) ? t : findMouseArea(t)
+        if (ma && ma.keyNavHold === true && (ma.acceptedButtons & Qt.LeftButton)) return { own: null, ma: ma }
+        return null
+    }
+    function startHold(key, mods) {
+        const t = cursor
+        const h = t ? holdTargetOf(t) : null
+        if (!h) return false
+        hold = { key: key, t: t, own: h.own, ma: h.ma, mods: mods, fired: false }
+        if (h.own) h.own.keyNavHoldStart()
+        else {
+            // -1 is Qt's default (the platform's 800 ms).
+            holdTimer.interval = h.ma.pressAndHoldInterval > 0 ? h.ma.pressAndHoldInterval : 800
+            holdTimer.restart()
+        }
+        return true
+    }
+    // `commit`: the key came up (a short press is a click); otherwise the
+    // hold was cut off (cursor moved, surface reset) and nothing fires.
+    function endHold(commit) {
+        const h = hold
+        if (!h) return
+        hold = null
+        holdTimer.stop()
+        if (h.own) { h.own.keyNavHoldEnd(); return }
+        if (!commit || h.fired || !h.ma.enabled) return
+        click(h.ma, Qt.LeftButton, h.mods)
+        activated(h.t, false)
+    }
+    Timer {
+        id: holdTimer
+        repeat: false
+        onTriggered: {
+            const h = root.hold
+            if (!h || !h.ma) return
+            h.fired = true
+            KeyNavState.button = Qt.LeftButton
+            h.ma.pressAndHold(null)
+        }
+    }
+    function handleRelease(event) {
+        if (!hold || event.isAutoRepeat || event.key !== hold.key) return false
+        endHold(true)
+        return accept(event)
+    }
+    // The ring is cleared with the cursor or the key mode, so the next one
+    // appears in place instead of gliding in from a stale spot.
+    onCursorChanged: { endHold(false); if (!cursor) ring.hide() }
+    onActiveChanged: if (!active) { endHold(false); ring.hide() }
+    onKeyModeChanged: if (!keyMode) { endHold(false); ring.hide() }
+
     function activate(secondary, modifiers) {
         const t = cursor
         if (!t) return false
@@ -376,6 +443,9 @@ Item {
 
         if (!keyMode || !cursor) return false
         if (k === Qt.Key_Return || k === Qt.Key_Enter || (k === Qt.Key_Space && plain)) {
+            // Held down: the repeats belong to the hold.
+            if (hold) return accept(event)
+            if (!event.isAutoRepeat && startHold(k, mods & Qt.ShiftModifier)) return accept(event)
             return activate(false, mods & Qt.ShiftModifier) ? accept(event) : false
         }
         if (k === Qt.Key_Menu || (k === Qt.Key_F10 && (mods & Qt.ShiftModifier))) {
@@ -418,6 +488,7 @@ Item {
     // build and fade in over their first frames).
     property int seekTries: 0
     function reset(keys) {
+        endHold(false)
         cursor = null; cursorKind = ""; cursorIndex = -1
         keyMode = !!keys
         seekTries = 0
@@ -604,15 +675,28 @@ Item {
         property real tr: 0
         property real bl: 0
         property real br: 0
-        property bool gliding: false
+        // The glide: one tween from where the ring was drawn to where the
+        // control is *now*, re-aimed every frame, so a moving target (the
+        // network bubbles drift, cards scale on hover) is followed without
+        // restarting an animation each frame, and the corners blend with the
+        // size instead of snapping. Past the tween it tracks the control.
+        property var from: null
+        property real glideStart: 0
+        readonly property int glideMs: 180
         readonly property real gap: 2
         readonly property real thickness: 2
         property color color: ThemeBackend.primary
+        Behavior on color { ColorAnimation { duration: 180; easing.type: Easing.OutCubic } }
         property Item surfaceFor: null
         property Item surface: null
 
-        function glide() { gliding = true; glideEnd.restart(); update() }
-        Timer { id: glideEnd; interval: 200; onTriggered: ring.gliding = false }
+        function glide() {
+            // Nothing drawn yet (first key, a page swap): appear in place.
+            from = rect.w > 0 ? { x: rect.x, y: rect.y, w: rect.w, h: rect.h, tl: tl, tr: tr, bl: bl, br: br } : null
+            glideStart = Date.now()
+            update()
+        }
+        function hide() { rect = { x: 0, y: 0, w: 0, h: 0 }; from = null }
 
         function clipOf(t) {
             let c = { x: 0, y: 0, w: root.width, h: root.height }
@@ -624,8 +708,8 @@ Item {
         }
         function update() {
             const t = root.cursor
-            if (!t || !root.active || !root.keyMode) { rect = { x: 0, y: 0, w: 0, h: 0 }; return }
-            if (!root.cursorAlive()) { rect = { x: 0, y: 0, w: 0, h: 0 }; restoreLater.restart(); return }
+            if (!t || !root.active || !root.keyMode) { hide(); return }
+            if (!root.cursorAlive()) { hide(); restoreLater.restart(); return }
             // The ring goes around `keyNavRingItem` when the stop names one
             // (a click area much bigger than what it draws: the bar's media
             // info spans the full bar height in a clipped row).
@@ -641,13 +725,25 @@ Item {
             inner = !!fill || !Logic.contains(room, Logic.grow(r, out))
             const ins = fill ? gap : 1
             const g = inner ? Logic.grow(r, -ins) : Logic.grow(r, out)
-            if (g.x !== rect.x || g.y !== rect.y || g.w !== rect.w || g.h !== rect.h) rect = g
             // Corners scale with the control (rectOf is its drawn size); a
             // square corner stays square.
             const k = s.width > 0 ? r.w / s.width : 1
             const cs = root.cornersOf(s)
             const fit = v => Math.max(0, Math.min(g.h / 2, g.w / 2, inner ? v * k - ins : (v > 0 ? v * k + out : 0)))
-            tl = fit(cs.tl); tr = fit(cs.tr); bl = fit(cs.bl); br = fit(cs.br)
+            let d = { x: g.x, y: g.y, w: g.w, h: g.h, tl: fit(cs.tl), tr: fit(cs.tr), bl: fit(cs.bl), br: fit(cs.br) }
+            if (from) {
+                const p = Math.min(1, (Date.now() - glideStart) / glideMs)
+                if (p >= 1) from = null
+                else {
+                    const e = 1 - Math.pow(1 - p, 3)   // OutCubic
+                    const f = from
+                    const mix = (a, b) => a + (b - a) * e
+                    d = { x: mix(f.x, d.x), y: mix(f.y, d.y), w: mix(f.w, d.w), h: mix(f.h, d.h),
+                          tl: mix(f.tl, d.tl), tr: mix(f.tr, d.tr), bl: mix(f.bl, d.bl), br: mix(f.br, d.br) }
+                }
+            }
+            if (d.x !== rect.x || d.y !== rect.y || d.w !== rect.w || d.h !== rect.h) rect = { x: d.x, y: d.y, w: d.w, h: d.h }
+            tl = d.tl; tr = d.tr; bl = d.bl; br = d.br
         }
         Timer { id: restoreLater; interval: 30; onTriggered: root.restore() }
 
@@ -663,10 +759,6 @@ Item {
         visible: root.active && root.keyMode && rect.w > 0
         opacity: visible ? 1 : 0
 
-        Behavior on x { enabled: ring.gliding; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-        Behavior on y { enabled: ring.gliding; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-        Behavior on width { enabled: ring.gliding; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-        Behavior on height { enabled: ring.gliding; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
         Behavior on opacity { NumberAnimation { duration: 120 } }
 
         Rectangle {

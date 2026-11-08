@@ -436,6 +436,7 @@ Variants {
                     barKeysIdle.restart();
                     barNav.handle(event);
                 }
+                Keys.onReleased: (event) => barNav.handleRelease(event)
             }
             KeyNav {
                 id: barNav

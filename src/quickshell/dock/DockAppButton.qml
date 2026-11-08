@@ -341,6 +341,8 @@ Item {
             property bool inDragHold: false
 
             pressAndHoldInterval: 350
+            // Meander: Enter held on the app (KeyNav) holds like the mouse.
+            property bool keyNavHold: true
 
             drag.target: floatWrapper
             drag.axis: Drag.XAndYAxis
@@ -371,16 +373,19 @@ Item {
                 }
             }
 
-            onPressAndHold: {
-                inDragHold = true;
+            onPressAndHold: function(mouse) {
                 if (!dockWindow.editMode) {
                     dockWindow.setEditMode(true);
                 }
-                dockWindow.dragSourceIndex = dockButton.itemIndex;
-                dockWindow.dropTargetIndex = dockButton.itemIndex;
                 if (typeof Sounds !== "undefined") {
                     Sounds.playSfx("guide/barconfig/out.wav");
                 }
+                // Meander: a keyboard hold (KeyNav, no event) only enters edit
+                // mode; there is no drag and no release to end one.
+                if (!mouse) return;
+                inDragHold = true;
+                dockWindow.dragSourceIndex = dockButton.itemIndex;
+                dockWindow.dropTargetIndex = dockButton.itemIndex;
             }
 
             onPositionChanged: function(mouse) {

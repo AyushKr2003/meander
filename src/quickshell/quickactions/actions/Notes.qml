@@ -601,6 +601,8 @@ Item {
 
                                 property real startY: 0
                                 property bool draggingV: false
+                                // Meander: Enter held on a note (KeyNav) selects it, as a long press.
+                                property bool keyNavHold: true
 
                                 onPressed: mouse => {
                                     startY = mouse.y;

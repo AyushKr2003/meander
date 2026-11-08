@@ -684,6 +684,8 @@ PanelWindow {
                 // Meander: keys no popout control took drive the keyboard
                 // cursor (KeyNav).
                 Keys.onPressed: (event) => keyNav.handle(event)
+                // Key-up ends a press and hold (KeyNav.handleRelease).
+                Keys.onReleased: (event) => keyNav.handleRelease(event)
                 // A popout's own Shortcuts beat any Keys handler: while the
                 // cursor is shown, its keys are claimed so they reach it
                 // (not the calendar's arrows: vimKeysOnly).

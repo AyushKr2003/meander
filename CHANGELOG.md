@@ -4,6 +4,20 @@ What changed in each version of Meander, newest first. Versions are the ones in 
 
 Meander's version is the Serpantinum release it is built on plus a port revision: `2.4.2-1` is the first Meander release on Serpantinum 2.4.2, `2.4.2-2` a Meander-only change on the same base, and `2.4.3-1` the first release after merging Serpantinum 2.4.3. `upstream.json` holds the exact upstream commit; `meander upstream` shows how far behind Serpantinum's latest release and master it is.
 
+## 2.4.2-12 - 2026-11-08
+
+Upstream base: unchanged (Serpantinum v2.4.2 +10 commits, `246061b`).
+
+### Added
+- **keyboard navigation**: holding Enter or Space on a press-and-hold control acts like holding the mouse button: hold-to-confirm buttons (lock screen power, wellbeing, network, About) charge while the key is down and drain when it is let go early, holding on a dock app enters edit mode, holding on a note selects it; a short press is still a click
+
+### Changed
+- **bar**: larger tray icons
+
+### Fixed
+- **keyboard navigation**: the focus ring glides smoothly to the next control, following it while it moves (the network bubbles, cards scaling on hover) instead of lagging behind and jumping into place; its corners and colour blend along the way, and it no longer glides in from a stale spot after a page change or after using the mouse
+- **keyboard navigation**: the focus ring goes around the bar's media art and title instead of over them
+
 ## 2.4.2-11 - 2026-11-08
 
 Upstream base: unchanged (Serpantinum v2.4.2 +10 commits, `246061b`).

@@ -47,6 +47,43 @@ Item {
 
     property bool isHoveredOrHighlighted: (btnMa.containsMouse || root.action_highlight) && !root.isTriggered
 
+    // Meander: Enter / Space held on the button charges it like a held mouse
+    // button (KeyNav calls these on key down / key up).
+    property bool keyHeld: false
+    function keyNavHoldStart() {
+        if (root.isTriggered) return;
+        root.keyHeld = true;
+        root.startCharge();
+    }
+    function keyNavHoldEnd() {
+        if (!root.keyHeld) return;
+        root.keyHeld = false;
+        root.stopCharge();
+    }
+    function startCharge() {
+        if (!root.isTriggered) {
+            if (root.chargingSoundHandle !== -1 && typeof Sounds !== "undefined") {
+                Sounds.stopSfx(root.chargingSoundHandle);
+                root.chargingSoundHandle = -1;
+            }
+            if (typeof Sounds !== "undefined") {
+                root.chargingSoundHandle = Sounds.playUntilStopped("reusables/fillbutton/charge_loop.wav", 0.6, false);
+            }
+            drainAnim.stop();
+            fillAnim.start();
+        }
+    }
+    function stopCharge() {
+        if (!root.isTriggered && root.fillLevel < 1.0) {
+            if (root.chargingSoundHandle !== -1 && typeof Sounds !== "undefined") {
+                Sounds.stopSfx(root.chargingSoundHandle);
+                root.chargingSoundHandle = -1;
+            }
+            fillAnim.stop();
+            drainAnim.start();
+        }
+    }
+
     function reset() {
         resetTimer.stop();
         root.isTriggered = false;
@@ -292,7 +329,7 @@ Item {
             id: glass
             anchors.fill: parent
             shadow: 1
-            press: (btnMa.pressed && !root.isTriggered) ? 0.6 + 0.4 * root.fillLevel : (root.isHoveredOrHighlighted ? 0.25 : 0)
+            press: ((btnMa.pressed || root.keyHeld) && !root.isTriggered) ? 0.6 + 0.4 * root.fillLevel : (root.isHoveredOrHighlighted ? 0.25 : 0)
             pulse: Math.min(1, root.flashOpacity * 2.5)
             Behavior on press { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
             radius: root.effectiveRadius
@@ -301,7 +338,7 @@ Item {
             Behavior on tintAmount { NumberAnimation { duration: 150 } }
         }
 
-        scale: (btnMa.pressed && !root.isTriggered ? 0.96 : (root.isHoveredOrHighlighted ? 1.02 : 1.0)) * root.popScale
+        scale: ((btnMa.pressed || root.keyHeld) && !root.isTriggered ? 0.96 : (root.isHoveredOrHighlighted ? 1.02 : 1.0)) * root.popScale
         Behavior on scale { NumberAnimation { duration: 250; easing.type: Easing.OutQuint } }
 
         SequentialAnimation {
@@ -392,41 +429,12 @@ Item {
             enabled: !root.isTriggered
             cursorShape: root.isTriggered ? Qt.ArrowCursor : Qt.PointingHandCursor
 
-            onPressed: {
-                if (!root.isTriggered) {
-                    if (root.chargingSoundHandle !== -1 && typeof Sounds !== "undefined") {
-                        Sounds.stopSfx(root.chargingSoundHandle);
-                        root.chargingSoundHandle = -1;
-                    }
-                    if (typeof Sounds !== "undefined") {
-                        root.chargingSoundHandle = Sounds.playUntilStopped("reusables/fillbutton/charge_loop.wav", 0.6, false);
-                    }
-                    drainAnim.stop();
-                    fillAnim.start();
-                }
-            }
+            // Meander: the charge lives in startCharge/stopCharge, shared with the keyboard.
+            onPressed: root.startCharge()
 
-            onReleased: {
-                if (!root.isTriggered && root.fillLevel < 1.0) {
-                    if (root.chargingSoundHandle !== -1 && typeof Sounds !== "undefined") {
-                        Sounds.stopSfx(root.chargingSoundHandle);
-                        root.chargingSoundHandle = -1;
-                    }
-                    fillAnim.stop();
-                    drainAnim.start();
-                }
-            }
+            onReleased: root.stopCharge()
 
-            onCanceled: {
-                if (!root.isTriggered && root.fillLevel < 1.0) {
-                    if (root.chargingSoundHandle !== -1 && typeof Sounds !== "undefined") {
-                        Sounds.stopSfx(root.chargingSoundHandle);
-                        root.chargingSoundHandle = -1;
-                    }
-                    fillAnim.stop();
-                    drainAnim.start();
-                }
-            }
+            onCanceled: root.stopCharge()
         }
 
         NumberAnimation {
