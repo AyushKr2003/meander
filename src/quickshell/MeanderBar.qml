@@ -25,7 +25,7 @@ Item {
     property var shell: null
     property var manifest: null
 
-    readonly property string version: manifest && manifest.version ? manifest.version : "2.4.2-8"
+    readonly property string version: manifest && manifest.version ? manifest.version : "2.4.2-9"
 
     // Created first thing, so the notification server (when Meander owns it,
     // see OmarchyHost.fileOwns) is on the bus before the rest of the bar has
@@ -75,7 +75,15 @@ Item {
         return root.widgetTargets[String(id || "")] || null;
     }
 
+    // Third-party Omarchy bar widgets on Meander's bar (PluginWidgets) answer
+    // their own panel hotkeys, as on the stock bar.
+    function pluginPanel(id) {
+        return root.targetFor(id) ? null : PluginWidgets.findPanelWidget(id);
+    }
+
     function summonBarWidget(id) {
+        let p = root.pluginPanel(id);
+        if (p) { p.open(); return true; }
         let t = root.targetFor(id);
         if (!t || !mainWindow) return false;
         mainWindow.runCommand("open", t[0], t[1]);
@@ -93,6 +101,8 @@ Item {
     }
 
     function hideBarWidget(id) {
+        let p = root.pluginPanel(id);
+        if (p) { p.close(); return true; }
         let t = root.targetFor(id);
         if (!t || !mainWindow) return false;
         if (root.shows(t)) mainWindow.runCommand("close", "", "");
@@ -100,7 +110,25 @@ Item {
     }
 
     function isBarWidgetOpen(id) {
+        let p = root.pluginPanel(id);
+        if (p) return p.opened === true;
         return root.shows(root.targetFor(id));
+    }
+
+    function moduleWidgets(id) { return PluginWidgets.moduleWidgets(id); }
+
+    // One popout at a time across Meander's popouts and the widgets' panels
+    // (PluginWidgets.closeMeanderPopout is set in Component.onCompleted).
+    Connections {
+        target: mainWindow
+        ignoreUnknownSignals: true
+        function onActiveWidgetChanged() {
+            // Later: closing, Main clears isClosing before currentActive, so
+            // the old popout's name shows for a moment on its way out.
+            if (mainWindow.activeWidget !== "hidden") Qt.callLater(() => {
+                if (mainWindow.activeWidget !== "hidden") PluginWidgets.closeActive();
+            });
+        }
     }
 
     function panelWidgetIdAt(section, index) { return ""; }
@@ -124,6 +152,7 @@ Item {
     Binding { target: OmarchyHost; property: "manifest"; value: root.manifest }
     Binding { target: OmarchyHost; property: "omarchyPath"; value: root.omarchyPath || "/usr/share/omarchy" }
     Binding { target: OmarchyHost; property: "barHidden"; value: root.barHidden }
+    Binding { target: OmarchyHost; property: "barWidgetRegistry"; value: root.barWidgetRegistry }
 
     // isEnabled() is a function, so ownership is re-read whenever the host's
     // config (shell.json) or plugin set changes.
@@ -304,5 +333,8 @@ Item {
         // Battery warnings stay Omarchy's unless omarchy.batteryAlerts is on
         // (SysNotif checks the setting itself).
         SysNotif.checkBattery();
+        PluginWidgets.closeMeanderPopout = function() {
+            if (mainWindow && mainWindow.activeWidget !== "hidden") mainWindow.runCommand("close", "", "");
+        };
     }
 }

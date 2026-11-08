@@ -791,10 +791,24 @@ Item {
         }
     }
 
+    // Meander: upstream's modules, then the third-party Omarchy bar widgets
+    // (BarModuleRegistry.pluginModuleIds) in a Repeater of their own, so a
+    // widget registering later doesn't rebuild every module.
     Repeater {
         id: moduleRepeater
-        model: BarModuleRegistry.moduleIds()
-        delegate: BarModule {
+        model: BarModuleRegistry.coreModuleIds()
+        delegate: barModuleDelegate
+    }
+
+    Repeater {
+        model: BarModuleRegistry.pluginModuleIds
+        delegate: barModuleDelegate
+    }
+
+    Component {
+        id: barModuleDelegate
+
+        BarModule {
             id: barMod
             orientation: "vertical"
             moduleId: modelData

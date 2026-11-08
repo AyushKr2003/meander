@@ -121,7 +121,11 @@ Rectangle {
     opacity: effectiveVisible ? 1.0 : 0.0
     visible: false
     function updateVisible() {
-        visible = opacity > 0 && (isVertical ? targetHeight : targetWidth) > 0;
+        // Meander: a third-party Omarchy widget (faces/plugin) hides itself
+        // with its own `visible`, which reads false while the module is
+        // unmapped: the module stays mapped (at no size) so it can come back.
+        const keep = faceLoader.item && faceLoader.item.keepVisible === true;
+        visible = keep || (opacity > 0 && (isVertical ? targetHeight : targetWidth) > 0);
     }
     onOpacityChanged: updateVisible()
     onTargetWidthChanged: updateVisible()
@@ -158,6 +162,7 @@ Rectangle {
         anchors.fill: parent
 
         onLoaded: {
+            root.updateVisible();
             if (item) {
                 if (item.module !== undefined) item.module = root;
                 if (item.widget !== undefined) item.widget = root;

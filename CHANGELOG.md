@@ -4,6 +4,13 @@ What changed in each version of Meander, newest first. Versions are the ones in 
 
 Meander's version is the Serpantinum release it is built on plus a port revision: `2.4.2-1` is the first Meander release on Serpantinum 2.4.2, `2.4.2-2` a Meander-only change on the same base, and `2.4.3-1` the first release after merging Serpantinum 2.4.3. `upstream.json` holds the exact upstream commit; `meander upstream` shows how far behind Serpantinum's latest release and master it is.
 
+## 2.4.2-9 - 2026-11-08
+
+Upstream base: unchanged (Serpantinum v2.4.2 +10 commits, `246061b`).
+
+### Added
+- **bar**: third-party Omarchy bar widgets (`bar-widget` plugins such as Superwhisper) can sit on Meander's bar. Each enabled one is listed in Settings -> Bar and placed like any module; its icon matches Meander's, its panel opens next to the bar, panel hotkeys open it, and only one panel or Meander popout is open at a time. Widgets that need their own plugin service (Daymark) show as unavailable, as on any replacement bar
+
 ## 2.4.2-8 - 2026-11-08
 
 Upstream base: unchanged (Serpantinum v2.4.2 +10 commits, `246061b`).

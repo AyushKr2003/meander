@@ -267,6 +267,25 @@ QtObject {
         }
     })
 
+    // Meander: third-party Omarchy bar widgets (omarchy/PluginWidgets.qml).
+    // Kept out of `types` so its translated bindings stay, and so TopBar and
+    // SideBar can build their delegates in a Repeater of their own: one
+    // widget coming or going doesn't rebuild every upstream module.
+    readonly property var pluginTypes: PluginWidgets.types
+    readonly property var pluginModuleIds: PluginWidgets.ids
+
+    function typeOf(id) {
+        return types[id] || pluginTypes[id] || null;
+    }
+
+    function isPluginModule(id) {
+        return !!pluginTypes[normalizeId(id)];
+    }
+
+    function coreModuleIds() {
+        return Object.keys(types);
+    }
+
     function getModuleVariant(moduleId) {
         let norm = normalizeId(moduleId);
         let bs = (typeof Config !== "undefined" && Config.rawSettings && Config.rawSettings.bar) ? Config.rawSettings.bar : {};
@@ -304,13 +323,13 @@ QtObject {
             return "classic";
         }
 
-        let t = types[norm];
+        let t = typeOf(norm);
         return t ? (t.defaultVariant || "default") : "default";
     }
 
     function faceFile(moduleId, variant) {
         let norm = normalizeId(moduleId);
-        let t = types[norm];
+        let t = typeOf(norm);
         if (!t) return "";
 
         let vKey = (variant !== undefined && variant !== null && variant !== "") ? variant : getModuleVariant(norm);
@@ -322,7 +341,7 @@ QtObject {
 
     function variantFaceFile(moduleId, variant) {
         let norm = normalizeId(moduleId);
-        let t = types[norm];
+        let t = typeOf(norm);
         if (!t || !t.variants) return faceFile(norm, variant);
         let vKey = variant || getModuleVariant(norm);
         let v = t.variants[vKey] || t.variants[t.defaultVariant];
@@ -331,23 +350,23 @@ QtObject {
     }
 
     function moduleIds() {
-        return Object.keys(types);
+        return Object.keys(types).concat(Object.keys(pluginTypes));
     }
 
     function moduleList() {
-        return Object.keys(types).map(k => Object.assign({ id: k }, types[k]));
+        return moduleIds().map(k => Object.assign({ id: k }, typeOf(k)));
     }
 
     function variantList(moduleId) {
         let norm = normalizeId(moduleId);
-        let t = types[norm];
+        let t = typeOf(norm);
         if (!t || !t.variants) return [];
         return Object.keys(t.variants).map(k => Object.assign({ id: k }, t.variants[k]));
     }
 
     function defaultVariant(moduleId) {
         let norm = normalizeId(moduleId);
-        let t = types[norm];
+        let t = typeOf(norm);
         return t ? (t.defaultVariant || "default") : "default";
     }
 

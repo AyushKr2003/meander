@@ -232,7 +232,7 @@ GuideTab {
             "vol": ThemeBackend.peach,
             "bat": ThemeBackend.green
         };
-        let mType = BarModuleRegistry.types ? BarModuleRegistry.types[id] : null;
+        let mType = BarModuleRegistry.typeOf ? BarModuleRegistry.typeOf(id) : null; // Meander: + plugin widgets
         return {
             "moduleId": id,
             "moduleLabel": labels[id] || (mType ? mType.name : id),

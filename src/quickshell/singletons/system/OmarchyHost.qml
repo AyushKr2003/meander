@@ -24,6 +24,9 @@ QtObject {
     property var manifest: null
     property string omarchyPath: Quickshell.env("OMARCHY_PATH") || "/usr/share/omarchy"
     property bool barHidden: false
+    // The host's bar widget catalogue (a snapshot for a replacement bar),
+    // read by PluginWidgets for third-party bar widgets.
+    property var barWidgetRegistry: null
 
     readonly property bool hosted: pluginRegistry !== null
 
