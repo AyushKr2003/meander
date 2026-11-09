@@ -105,6 +105,13 @@ GuideTab {
         return false;
     }
 
+    // Meander: hide the visualizer unless media is playing (VisFace).
+    property bool visOnlyWhilePlaying: {
+        let bs = Config.getSetting("bar", {});
+        if (bs && bs.visOnlyWhilePlaying !== undefined) return Boolean(bs.visOnlyWhilePlaying);
+        return false;
+    }
+
     property string sysmonStyle: {
         let bs = Config.getSetting("bar", {});
         if (bs && bs.sysmonStyle) return bs.sysmonStyle;
@@ -322,6 +329,8 @@ GuideTab {
         } else {
             barModulesRoot.visContinuous = false;
         }
+
+        barModulesRoot.visOnlyWhilePlaying = (bs && bs.visOnlyWhilePlaying !== undefined) ? Boolean(bs.visOnlyWhilePlaying) : false;
 
         if (bs && bs.sysmonStyle) {
             barModulesRoot.sysmonStyle = bs.sysmonStyle;
@@ -554,6 +563,13 @@ GuideTab {
         barModulesRoot.visContinuous = val;
         let current = Config.getSetting("bar", {});
         current.visContinuous = val;
+        Config.setSetting("bar", current);
+    }
+
+    function setVisOnlyWhilePlaying(val) {
+        barModulesRoot.visOnlyWhilePlaying = val;
+        let current = Config.getSetting("bar", {});
+        current.visOnlyWhilePlaying = val;
         Config.setSetting("bar", current);
     }
 

@@ -487,6 +487,10 @@
         "continuous": {
           "title": "Continuous wave",
           "desc": "Render a smooth fluid wave instead of discrete bars"
+        },
+        "only_while_playing": {
+          "title": "Only while playing",
+          "desc": "Hide the visualizer unless music or a video is playing"
         }
       },
       "sysmon": {

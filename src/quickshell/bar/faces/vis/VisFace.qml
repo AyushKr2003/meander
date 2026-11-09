@@ -22,8 +22,35 @@ Item {
     readonly property bool isPreview: activeTarget ? !!activeTarget.isPreview : (!barWindow)
 
     property bool showLayout: isPreview || !barWindow || barWindow.isStartupReady
-    property bool isVisVisible: (activeTarget ? activeTarget.moduleActive : true) && showLayout
-    property bool isFaceVisible: showLayout
+
+    // Meander: `visOnlyWhilePlaying` hides the visualizer (and lets go of
+    // cava) unless an MPRIS player is playing. `playingLatch` waits a moment
+    // before hiding, so a track change or a short pause does not blink it.
+    property bool onlyWhilePlaying: {
+        if (widget && widget !== root && widget.visOnlyWhilePlaying !== undefined) return Boolean(widget.visOnlyWhilePlaying);
+        if (module && module.visOnlyWhilePlaying !== undefined) return Boolean(module.visOnlyWhilePlaying);
+        let dummy = configRevision;
+        if (typeof Config !== "undefined" && Config.rawSettings) {
+            let bs = Config.rawSettings.bar || {};
+            if (bs.visOnlyWhilePlaying !== undefined) return Boolean(bs.visOnlyWhilePlaying);
+        }
+        return false;
+    }
+    readonly property bool mediaPlaying: MprisController.isPlaying
+    property bool playingLatch: mediaPlaying
+    onMediaPlayingChanged: {
+        if (mediaPlaying) { playingGrace.stop(); playingLatch = true; }
+        else playingGrace.restart();
+    }
+    Timer {
+        id: playingGrace
+        interval: 2500
+        onTriggered: root.playingLatch = root.mediaPlaying
+    }
+    readonly property bool playbackHidden: onlyWhilePlaying && !isPreview && !playingLatch
+
+    property bool isVisVisible: (activeTarget ? activeTarget.moduleActive : true) && showLayout && !playbackHidden
+    property bool isFaceVisible: showLayout && !playbackHidden
     readonly property bool shouldSubscribe: isVisVisible
 
     property int configRevision: 0
@@ -102,7 +129,7 @@ Item {
     readonly property real contentLength: root.barCount * barThickness + Math.max(0, root.barCount - 1) * barSp
     readonly property real padding: isVertical ? (barWindow ? barWindow.cs(root.isCompact ? 18 : 22) : (root.isCompact ? 18 : 22)) : (barWindow ? barWindow.cs(root.isCompact ? 20 : 24) : (root.isCompact ? 20 : 24))
 
-    property real targetLength: ((activeTarget ? activeTarget.moduleActive : true) && contentLength > 0) ? (contentLength + padding) : 0
+    property real targetLength: ((activeTarget ? activeTarget.moduleActive : true) && !playbackHidden && contentLength > 0) ? (contentLength + padding) : 0
 
     readonly property real crossSize: (barWindow && typeof barWindow.s === "function") ? barWindow.cs(root.isCompact ? 24 : 32) : (root.isCompact ? 24 : 32)
     implicitWidth: isVertical ? crossSize : targetLength

@@ -152,4 +152,27 @@ BarModuleCard {
             }
         }
     }
+
+    // Meander: not upstream (see docs/parity.md)
+    SettingsRow {
+        rootObj: card.rootObj
+        settingId: "bar_vis_only_while_playing"
+        searchKeywords: "visualizer cava hide playing paused music video media auto idle"
+        baseColor: Qt.alpha(ThemeBackend.surface1, 0.35)
+        icon: "󰝛"
+        title: I18n.t("guide.bar.vis.only_while_playing.title", "Only while playing")
+        description: I18n.t("guide.bar.vis.only_while_playing.desc", "Hide the visualizer unless music or a video is playing")
+
+        Toggle {
+            Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+            checked: card.tab.visOnlyWhilePlaying
+            accentColor: ThemeBackend.mauve
+            baseColor: ThemeBackend.surface1
+            handleColor: ThemeBackend.crust
+            handleOffColor: ThemeBackend.text
+            onToggled: function(c) {
+                card.tab.setVisOnlyWhilePlaying(c);
+            }
+        }
+    }
 }
